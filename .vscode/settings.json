@@ -1,0 +1,7 @@
+{
+    "yaml.schemas": {
+        "moodle.yml.schema.json": [
+            "moodle.yml"
+        ]
+    }
+}

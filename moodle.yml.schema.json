@@ -1,0 +1,182 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "EduPlanner Demo Config",
+    "type": "object",
+    "required": [
+        "users",
+        "courses"
+    ],
+    "properties": {
+        "users": {
+            "description": "Moodle Users to create.",
+            "type": "array",
+            "items": {
+                "anyOf": [
+                    {
+                        "type": "object",
+                        "required": [
+                            "name",
+                            "capabilities",
+                            "token",
+                            "class",
+                            "task-status"
+                        ],
+                        "properties": {
+                            "task-status": {
+                                "type": "object",
+                                "description": "Map<String, submitted|done>",
+                                "additionalProperties": {
+                                    "type": "string",
+                                    "enum": [
+                                        "submitted",
+                                        "completed"
+                                    ]
+                                }
+                            },
+                            "class": {
+                                "type": "string",
+                                "enum": [
+                                    "1A",
+                                    "1B",
+                                    "2A",
+                                    "2B",
+                                    "3A",
+                                    "3B",
+                                    "4A",
+                                    "4B",
+                                    "5A",
+                                    "5B"
+                                ]
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "submitted_tasks": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "capabilities": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "enum": [
+                                        "student",
+                                        "teacher",
+                                        "slotmaster"
+                                    ]
+                                }
+                            },
+                            "token": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "name",
+                            "capabilities",
+                            "token"
+                        ],
+                        "properties": {
+                            "class": {
+                                "type": "string",
+                                "enum": [
+                                    "1A",
+                                    "1B",
+                                    "2A",
+                                    "2B",
+                                    "3A",
+                                    "3B",
+                                    "4A",
+                                    "4B",
+                                    "5A",
+                                    "5B"
+                                ]
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "submitted_tasks": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "capabilities": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "enum": [
+                                        "teacher",
+                                        "slotmaster"
+                                    ]
+                                }
+                            },
+                            "token": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                ]
+            }
+        },
+        "courses": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "tasks"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "integer"
+                    },
+                    "tasks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "name",
+                                "description",
+                                "due",
+                                "type"
+                            ],
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                },
+                                "type": {
+                                    "enum": [
+                                        "assignment",
+                                        "exam"
+                                    ],
+                                    "default": "assignment"
+                                },
+                                "description": {
+                                    "type": "string"
+                                },
+                                "due": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "description": "Days from the creation of the task until due"
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    }
+                },
+                "additionalProperties": false
+            }
+        }
+    },
+    "additionalProperties": false
+}

@@ -1,0 +1,40 @@
+users:
+  - name: Student
+    capabilities:
+      - student
+    class: "2B"
+    token: abc123token
+    task-status:
+      Mathematics.Integrals: completed
+      Physics.Mechanics: submitted
+
+courses:
+  - name: Mathematics
+    tasks:
+      - name: Integrals
+        description: |
+          Solve the following integrals.
+        due: 5
+        type: assignment
+      - name: Derivatives
+        description: |
+          Find the derivatives of the given functions.
+        due: 3
+        type: assignment
+      - name: Midterm Exam
+        description: |
+          Midterm exam covering chapters 1-5.
+        due: 10
+        type: exam
+  - name: Physics
+    tasks:
+      - name: Mechanics
+        description: |
+          Complete the mechanics problems provided.
+        due: 4
+        type: assignment
+      - name: Final Exam
+        description: |
+          Comprehensive final exam covering all topics.
+        due: 12
+        type: exam
