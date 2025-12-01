@@ -1,13 +1,3 @@
-users:
-  - name: Student
-    capabilities:
-      - student
-    class: "2B"
-    token: abc123token
-    task-status:
-      Mathematics.Integrals: completed
-      Physics.Mechanics: submitted
-
 courses:
   - name: Mathematics
     tasks:

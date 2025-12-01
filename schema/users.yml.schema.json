@@ -1,10 +1,9 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "EduPlanner Demo Config",
+    "title": "EduPlanner Demo Users Config",
     "type": "object",
     "required": [
-        "users",
-        "courses"
+        "users"
     ],
     "properties": {
         "users": {
@@ -25,13 +24,44 @@
                             "task-status": {
                                 "type": "object",
                                 "description": "Map<String, submitted|done>",
-                                "additionalProperties": {
-                                    "type": "string",
-                                    "enum": [
-                                        "submitted",
-                                        "completed"
-                                    ]
-                                }
+                                "properties": {
+                                    "mathematics.integrals": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
+                                    "mathematics.derivatives": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
+                                    "mathematics.midtermexam": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
+                                    "physics.mechanics": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
+                                    "physics.finalexam": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    }
+                                },
+                                "additionalProperties": false
                             },
                             "class": {
                                 "type": "string",
@@ -100,12 +130,6 @@
                             "name": {
                                 "type": "string"
                             },
-                            "submitted_tasks": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
-                                }
-                            },
                             "capabilities": {
                                 "type": "array",
                                 "items": {
@@ -123,58 +147,6 @@
                         "additionalProperties": false
                     }
                 ]
-            }
-        },
-        "courses": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "required": [
-                    "name",
-                    "tasks"
-                ],
-                "properties": {
-                    "name": {
-                        "type": "string"
-                    },
-                    "id": {
-                        "type": "integer"
-                    },
-                    "tasks": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "required": [
-                                "name",
-                                "description",
-                                "due",
-                                "type"
-                            ],
-                            "properties": {
-                                "name": {
-                                    "type": "string"
-                                },
-                                "type": {
-                                    "enum": [
-                                        "assignment",
-                                        "exam"
-                                    ],
-                                    "default": "assignment"
-                                },
-                                "description": {
-                                    "type": "string"
-                                },
-                                "due": {
-                                    "type": "integer",
-                                    "minimum": 0,
-                                    "description": "Days from the creation of the task until due"
-                                }
-                            },
-                            "additionalProperties": false
-                        }
-                    }
-                },
-                "additionalProperties": false
             }
         }
     },

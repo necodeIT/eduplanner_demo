@@ -1,0 +1,63 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "EduPlanner Demo Courses Config",
+    "type": "object",
+    "required": [
+        "courses"
+    ],
+    "properties": {
+        "courses": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "tasks"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "integer"
+                    },
+                    "tasks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "name",
+                                "description",
+                                "due",
+                                "type"
+                            ],
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                },
+                                "type": {
+                                    "enum": [
+                                        "assignment",
+                                        "exam"
+                                    ],
+                                    "default": "assignment"
+                                },
+                                "description": {
+                                    "type": "string"
+                                },
+                                "due": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "description": "Days from the creation of the task until due"
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    }
+                },
+                "additionalProperties": false
+            }
+        }
+    },
+    "additionalProperties": false
+}

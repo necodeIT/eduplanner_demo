@@ -1,71 +1,12 @@
 #!/bin/python3
-from enum import Enum
 import yaml
+from model import Task, Course, User, Capability, Clazz, TaskStatus, toId
 
 
-def toId(name: str) -> str:
-    return name.lower().replace(" ", "")
+def read_users_config(tasks: list[Task]) -> list[User]:
+    with open("users.yml") as f:
+        config = yaml.safe_load(f)
 
-
-class TaskStatus(Enum):
-    PENDING = "pending"
-    COMPLETED = "completed"
-    OVERDUE = "overdue"
-    SUBMITTED = "submitted"
-
-
-class Task:
-    def __init__(self, name: str, parent: str, due: int, description: str):
-        self.name = name
-        self.parent = parent
-        self.due = due
-        self.description = description
-        self.id = toId(f"{parent}.{name}")
-
-
-class Course:
-    def __init__(self, name: str, tasks: list[Task]):
-        self.name = name
-        self.id = toId(name)
-        self.tasks = tasks
-
-
-class Capability(Enum):
-    STUDENT = "student"
-    TEACHER = "teacher"
-    SLOTMASTER = "slotmaster"
-
-
-class Clazz(Enum):
-    A1 = "1A"
-    B1 = "1B"
-    A2 = "2A"
-    B2 = "2B"
-    A3 = "3A"
-    B3 = "3B"
-    A4 = "4A"
-    B4 = "4B"
-    A5 = "5A"
-    B5 = "5B"
-
-
-class User:
-    def __init__(
-        self,
-        name: str,
-        capabilities: list[Capability],
-        clazz: Clazz | None,
-        token: str,
-        task_status: dict[Task, TaskStatus],
-    ):
-        self.name = name
-        self.capabilities = capabilities
-        self.clazz = clazz
-        self.token = token
-        self.task_status = task_status
-
-
-def read_users_config(config, tasks: list[Task]) -> list[User]:
     users = []
     for user_data in config["users"]:
         capabilities = [Capability(cap) for cap in user_data.get("capabilities", [])]
@@ -92,7 +33,10 @@ def read_users_config(config, tasks: list[Task]) -> list[User]:
     return users
 
 
-def read_courses_config(config) -> list[Course]:
+def read_courses_config() -> list[Course]:
+
+    with open("courses.yml") as f:
+        config = yaml.safe_load(f)
     courses = []
     for course_data in config["courses"]:
         tasks = []
@@ -110,13 +54,11 @@ def read_courses_config(config) -> list[Course]:
 
 
 def read_moodle_config() -> tuple[list[User], list[Course]]:
-    with open("moodle.yml") as f:
-        data = yaml.safe_load(f)
 
-    courses = read_courses_config(data)
+    courses = read_courses_config()
 
     return (
-        read_users_config(data, [task for course in courses for task in course.tasks]),
+        read_users_config([task for course in courses for task in course.tasks]),
         courses,
     )
 

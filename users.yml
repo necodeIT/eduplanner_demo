@@ -1,0 +1,13 @@
+users:
+  - name: Student
+    capabilities:
+      - student
+    class: "1A"
+    token: abc123token
+    task-status:
+      mathematics.derivatives: submitted
+      physics.mechanics: submitted
+  - name: Teacher
+    capabilities:
+      - teacher
+    token: teachertoken456
