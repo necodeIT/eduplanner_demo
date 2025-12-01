@@ -25,6 +25,13 @@
                                 "type": "object",
                                 "description": "Map<String, submitted|done>",
                                 "properties": {
+                                    "mathematics.algebra_foundations": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
                                     "mathematics.integrals": {
                                         "type": "string",
                                         "enum": [
@@ -46,6 +53,13 @@
                                             "submitted"
                                         ]
                                     },
+                                    "mathematics.final_exam": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
                                     "physics.mechanics": {
                                         "type": "string",
                                         "enum": [
@@ -53,7 +67,77 @@
                                             "submitted"
                                         ]
                                     },
+                                    "physics.electricity_and_magnetism": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
+                                    "physics.waves_and_optics": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
                                     "physics.final_exam": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
+                                    "literature.poetry_analysis": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
+                                    "literature.modern_novel_essay": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
+                                    "literature.research_presentation": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
+                                    "literature.final_exam": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
+                                    "computer_science.intro_to_programming": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
+                                    "computer_science.data_structures": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
+                                    "computer_science.algorithms_quiz": {
+                                        "type": "string",
+                                        "enum": [
+                                            "completed",
+                                            "submitted"
+                                        ]
+                                    },
+                                    "computer_science.capstone_project": {
                                         "type": "string",
                                         "enum": [
                                             "completed",

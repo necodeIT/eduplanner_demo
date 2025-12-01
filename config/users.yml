@@ -1,13 +1,52 @@
 users:
-  - name: Student
+  - name: Alice Johnson
     capabilities:
       - student
     class: "1A"
-    token: abc123token
+    token: token-alice-1a
+    task-status:
+      mathematics.algebra_foundations: completed
+      mathematics.integrals: submitted
+      physics.mechanics: completed
+      physics.electricity_and_magnetism: submitted
+  - name: Brian Patel
+    capabilities:
+      - student
+    class: "1B"
+    token: token-brian-1b
     task-status:
       mathematics.derivatives: submitted
+      literature.poetry_analysis: completed
+      computer_science.intro_to_programming: completed
+      physics.electricity_and_magnetism: submitted
+  - name: Carla Nguyen
+    capabilities:
+      - student
+    class: "2A"
+    token: token-carla-2a
+    task-status:
+      mathematics.midterm_exam: submitted
+      mathematics.final_exam: submitted
+      physics.waves_and_optics: completed
+      literature.research_presentation: submitted
+      computer_science.data_structures: submitted
+  - name: Diego Ruiz
+    capabilities:
+      - student
+    class: "2B"
+    token: token-diego-2b
+    task-status:
+      mathematics.integrals: completed
+      mathematics.derivatives: completed
       physics.mechanics: submitted
-  - name: Teacher
+      computer_science.algorithms_quiz: submitted
+      computer_science.capstone_project: submitted
+  - name: Prof. Elaine Brooks
     capabilities:
       - teacher
-    token: teachertoken456
+    token: token-elaine-teacher
+  - name: Scheduler Admin
+    capabilities:
+      - teacher
+      - slotmaster
+    token: token-scheduler-ops

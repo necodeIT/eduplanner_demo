@@ -1,30 +1,94 @@
 courses:
   - name: Mathematics
     tasks:
+      - name: Algebra Foundations
+        description: |
+          Build comfort with linear equations, factoring, and polynomial manipulation.
+        due: 3
+        type: assignment
       - name: Integrals
         description: |
-          Solve the following integrals.
+          Solve definite and indefinite integrals with substitution and by parts.
         due: 5
         type: assignment
       - name: Derivatives
         description: |
-          Find the derivatives of the given functions.
-        due: 3
+          Differentiate polynomial, exponential, and trigonometric functions; interpret rates of change.
+        due: 4
         type: assignment
       - name: Midterm Exam
         description: |
-          Midterm exam covering chapters 1-5.
+          Exam on limits, derivatives, and basic integration techniques.
         due: 10
+        type: exam
+      - name: Final Exam
+        description: |
+          Cumulative exam covering all calculus topics from the term.
+        due: 18
         type: exam
   - name: Physics
     tasks:
       - name: Mechanics
         description: |
-          Complete the mechanics problems provided.
+          Work through kinematics and Newton's laws problem sets with free-body diagrams.
         due: 4
+        type: assignment
+      - name: Electricity and Magnetism
+        description: |
+          Analyze circuits with Ohm's law and apply Maxwell's equations to simple field problems.
+        due: 6
+        type: assignment
+      - name: Waves and Optics
+        description: |
+          Model wave interference, diffraction, and basic lens systems.
+        due: 8
         type: assignment
       - name: Final Exam
         description: |
-          Comprehensive final exam covering all topics.
-        due: 12
+          Comprehensive physics exam spanning mechanics through optics.
+        due: 14
         type: exam
+  - name: Literature
+    tasks:
+      - name: Poetry Analysis
+        description: |
+          Close-read assigned poems focusing on meter, imagery, and tone in a short response.
+        due: 3
+        type: assignment
+      - name: Modern Novel Essay
+        description: |
+          Write a thesis-driven essay on character development in the selected modern novel.
+        due: 6
+        type: assignment
+      - name: Research Presentation
+        description: |
+          Present findings on a chosen author, including historical context and critical reception.
+        due: 10
+        type: assignment
+      - name: Final Exam
+        description: |
+          In-class essay exam comparing themes across the semester's readings.
+        due: 15
+        type: exam
+  - name: Computer Science
+    tasks:
+      - name: Intro to Programming
+        description: |
+          Implement basic control flow and functions in Python to solve small algorithmic problems.
+        due: 2
+        type: assignment
+      - name: Data Structures
+        description: |
+          Build and test list, stack, and queue implementations with time-complexity notes.
+        due: 6
+        type: assignment
+      - name: Algorithms Quiz
+        description: |
+          Short assessment on recursion, searching, and sorting fundamentals.
+        due: 7
+        type: exam
+      - name: Capstone Project
+        description: |
+          Develop a small CLI app with documentation and unit tests, to be demoed in class.
+        due: 14
+        type: assignment
