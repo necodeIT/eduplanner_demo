@@ -22,4 +22,4 @@ bash setup.sh
 
 ### Modifying Course and Task Configurations
 
-The course and task configurations are located in the `courses.yml` file. You can modify this file to add or change courses and tasks as needed. User configurations are in the `users.yml` file. Note that the schema for user configurations is auto-generated in `bin/autocomplete.py` to ensure that task IDs correspond to existing tasks. If you add new tasks, make sure to update the schema accordingly by running the autocomplete script (vscode should do this automatically if you've installed the recommended extensions).
+The course and task configurations are located in the `config/courses.yml` file. You can modify this file to add or change courses and tasks as needed. User configurations are in the `config/users.yml` file. Note that the schema for user configurations is auto-generated in `bin/autocomplete.py` to ensure that task IDs correspond to existing tasks. If you add new tasks, make sure to update the schema accordingly by running the autocomplete script (vscode should do this automatically if you've installed the recommended extensions).

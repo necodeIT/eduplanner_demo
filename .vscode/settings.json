@@ -1,10 +1,10 @@
 {
     "yaml.schemas": {
         "schema/users.yml.schema.json": [
-            "users.yml"
+            "config/users.yml"
         ],
         "schema/courses.yml.schema.json": [
-            "courses.yml"
+            "config/courses.yml"
         ]
     },
     "emeraldwalk.runonsave": {
@@ -14,5 +14,6 @@
                 "cmd": "source .venv/bin/activate && python3 bin/autocomplete.py"
             }
         ]
-    }
+    },
+    "python-envs.pythonProjects": []
 }

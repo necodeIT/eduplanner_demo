@@ -1,5 +1,6 @@
-from model import Capability, Clazz, Course, Task, TaskStatus, User, toId
+from model import Capability, Clazz, TaskStatus
 from config import read_courses_config
+
 
 courses = read_courses_config()
 

@@ -1,10 +1,16 @@
-#!/bin/python3
 import yaml
 from model import Task, Course, User, Capability, Clazz, TaskStatus, toId
 
 
 def read_users_config(tasks: list[Task]) -> list[User]:
-    with open("users.yml") as f:
+    """Reads the users configuration from the YAML file and creates User objects.
+
+    :param list[Task] tasks: A list of Task objects used to resolve task IDs in user
+                           task-status configurations.
+    :return list[User]: A list of User objects created from the configuration file, each
+                   containing name, capabilities, class, token, and task status mappings.
+    """
+    with open("config/users.yml") as f:
         config = yaml.safe_load(f)
 
     users = []
@@ -34,8 +40,16 @@ def read_users_config(tasks: list[Task]) -> list[User]:
 
 
 def read_courses_config() -> list[Course]:
+    """
+    Read and parse course configuration from a YAML file.
 
-    with open("courses.yml") as f:
+    Loads course data from 'config/courses.yml' and converts it into a list of Course objects.
+    Each course can contain multiple tasks with their respective properties.
+
+    :return list[Course]: A list of Course objects, each containing their associated tasks.
+    """
+
+    with open("config/courses.yml") as f:
         config = yaml.safe_load(f)
     courses = []
     for course_data in config["courses"]:
@@ -43,7 +57,7 @@ def read_courses_config() -> list[Course]:
         for task_data in course_data.get("tasks", []):
             task = Task(
                 name=task_data["name"],
-                parent=course_data["name"],
+                parent=toId(course_data["name"]),
                 due=task_data["due"],
                 description=task_data.get("description", ""),
             )
@@ -54,6 +68,10 @@ def read_courses_config() -> list[Course]:
 
 
 def read_moodle_config() -> tuple[list[User], list[Course]]:
+    """Reads the Moodle configuration including users and courses.
+
+    :return tuple[list[User], list[Course]]: A tuple containing a list of User objects and a list of Course objects.
+    """
 
     courses = read_courses_config()
 
