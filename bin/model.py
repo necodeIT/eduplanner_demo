@@ -2,7 +2,7 @@ from enum import Enum
 
 
 def toId(name: str) -> str:
-    return name.lower().replace(" ", "")
+    return name.lower().replace(" ", "_")
 
 
 class TaskStatus(Enum):

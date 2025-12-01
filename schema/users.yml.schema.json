@@ -39,7 +39,7 @@
                                             "submitted"
                                         ]
                                     },
-                                    "mathematics.midtermexam": {
+                                    "mathematics.midterm_exam": {
                                         "type": "string",
                                         "enum": [
                                             "completed",
@@ -53,7 +53,7 @@
                                             "submitted"
                                         ]
                                     },
-                                    "physics.finalexam": {
+                                    "physics.final_exam": {
                                         "type": "string",
                                         "enum": [
                                             "completed",
