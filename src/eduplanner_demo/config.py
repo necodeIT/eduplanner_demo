@@ -1,5 +1,5 @@
 import yaml
-from model import Task, Course, User, Capability, Clazz, TaskStatus, toId
+from eduplanner_demo.model import Task, Course, User, Capability, Clazz, TaskStatus, toId
 
 
 def read_users_config(tasks: list[Task]) -> list[User]:

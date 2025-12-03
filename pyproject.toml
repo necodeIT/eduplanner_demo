@@ -1,0 +1,38 @@
+[project]
+name = "eduplanner_demo"
+authors = [
+	{name = "Pallasys", email = "hello@necode.it"},
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+	'pyyaml'
+]
+keywords = ["moodle"]
+classifiers = [
+	"Development Status :: 3 - Alpha",
+	"Intended Audience :: Developers",
+	"Programming Language :: Python :: 3",
+	"Programming Language :: Python :: 3.10",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/necodeIT/eduplanner_demo"
+Repository = "https://github.com/necodeIT/eduplanner_demo.git"
+Issues = "https://github.com/necodeIT/eduplanner_demo/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/eduplanner_demo/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/config",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/eduplanner_demo"]

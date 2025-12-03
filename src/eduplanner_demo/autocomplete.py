@@ -1,6 +1,6 @@
-from model import Capability, Clazz, TaskStatus
-from config import read_courses_config
-
+from eduplanner_demo.model import Capability, Clazz, TaskStatus
+from eduplanner_demo.config import read_courses_config
+from os.path import dirname, join as pathjoin
 
 courses = read_courses_config()
 
@@ -99,8 +99,9 @@ SCHEMA = {
     "additionalProperties": False,
 }
 
+fp = pathjoin(dirname(dirname(__file__)), 'schema/users.yml.schema.json')
 
-with open("schema/users.yml.schema.json", "w") as f:
+with open(fp, "w") as f:
     import json
 
     json.dump(SCHEMA, f, indent=4)
