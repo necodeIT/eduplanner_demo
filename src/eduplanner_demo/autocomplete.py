@@ -1,6 +1,10 @@
 from eduplanner_demo.model import Capability, Clazz, TaskStatus
 from eduplanner_demo.config import read_courses_config
 from os.path import dirname, join as pathjoin
+from sys import exit
+
+if __name__ != "__main__":
+    exit(1)
 
 courses = read_courses_config()
 
