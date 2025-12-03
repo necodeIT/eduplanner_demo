@@ -27,6 +27,8 @@
                                 "properties": {
                                     "mathematics.algebra_foundations": {
                                         "type": "string",
+                                        "description": "Build comfort with linear equations, factoring, and polynomial manipulation.",
+                                        "title": "Algebra Foundations (Mathematics)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -34,6 +36,8 @@
                                     },
                                     "mathematics.integrals": {
                                         "type": "string",
+                                        "description": "Solve definite and indefinite integrals with substitution and by parts.",
+                                        "title": "Integrals (Mathematics)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -41,6 +45,8 @@
                                     },
                                     "mathematics.derivatives": {
                                         "type": "string",
+                                        "description": "Differentiate polynomial, exponential, and trigonometric functions; interpret rates of change.",
+                                        "title": "Derivatives (Mathematics)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -48,6 +54,8 @@
                                     },
                                     "mathematics.midterm_exam": {
                                         "type": "string",
+                                        "description": "Exam on limits, derivatives, and basic integration techniques.",
+                                        "title": "Midterm Exam (Mathematics)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -55,6 +63,8 @@
                                     },
                                     "mathematics.final_exam": {
                                         "type": "string",
+                                        "description": "Cumulative exam covering all calculus topics from the term.",
+                                        "title": "Final Exam (Mathematics)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -62,6 +72,8 @@
                                     },
                                     "physics.mechanics": {
                                         "type": "string",
+                                        "description": "Work through kinematics and Newton's laws problem sets with free-body diagrams.",
+                                        "title": "Mechanics (Physics)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -69,6 +81,8 @@
                                     },
                                     "physics.electricity_and_magnetism": {
                                         "type": "string",
+                                        "description": "Analyze circuits with Ohm's law and apply Maxwell's equations to simple field problems.",
+                                        "title": "Electricity and Magnetism (Physics)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -76,6 +90,8 @@
                                     },
                                     "physics.waves_and_optics": {
                                         "type": "string",
+                                        "description": "Model wave interference, diffraction, and basic lens systems.",
+                                        "title": "Waves and Optics (Physics)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -83,6 +99,8 @@
                                     },
                                     "physics.final_exam": {
                                         "type": "string",
+                                        "description": "Comprehensive physics exam spanning mechanics through optics.",
+                                        "title": "Final Exam (Physics)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -90,6 +108,8 @@
                                     },
                                     "literature.poetry_analysis": {
                                         "type": "string",
+                                        "description": "Close-read assigned poems focusing on meter, imagery, and tone in a short response.",
+                                        "title": "Poetry Analysis (Literature)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -97,6 +117,8 @@
                                     },
                                     "literature.modern_novel_essay": {
                                         "type": "string",
+                                        "description": "Write a thesis-driven essay on character development in the selected modern novel.",
+                                        "title": "Modern Novel Essay (Literature)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -104,6 +126,8 @@
                                     },
                                     "literature.research_presentation": {
                                         "type": "string",
+                                        "description": "Present findings on a chosen author, including historical context and critical reception.",
+                                        "title": "Research Presentation (Literature)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -111,6 +135,8 @@
                                     },
                                     "literature.final_exam": {
                                         "type": "string",
+                                        "description": "In-class essay exam comparing themes across the semester's readings.",
+                                        "title": "Final Exam (Literature)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -118,6 +144,8 @@
                                     },
                                     "computer_science.intro_to_programming": {
                                         "type": "string",
+                                        "description": "Implement basic control flow and functions in Python to solve small algorithmic problems.",
+                                        "title": "Intro to Programming (Computer Science)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -125,6 +153,8 @@
                                     },
                                     "computer_science.data_structures": {
                                         "type": "string",
+                                        "description": "Build and test list, stack, and queue implementations with time-complexity notes.",
+                                        "title": "Data Structures (Computer Science)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -132,6 +162,8 @@
                                     },
                                     "computer_science.algorithms_quiz": {
                                         "type": "string",
+                                        "description": "Short assessment on recursion, searching, and sorting fundamentals.",
+                                        "title": "Algorithms Quiz (Computer Science)",
                                         "enum": [
                                             "completed",
                                             "submitted"
@@ -139,6 +171,8 @@
                                     },
                                     "computer_science.capstone_project": {
                                         "type": "string",
+                                        "description": "Develop a small CLI app with documentation and unit tests, to be demoed in class.",
+                                        "title": "Capstone Project (Computer Science)",
                                         "enum": [
                                             "completed",
                                             "submitted"

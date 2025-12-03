@@ -10,6 +10,8 @@ tasks = [task.id for course in courses for task in course.tasks]
 status_props = {
     task.id: {
         "type": "string",
+        "description": task.description.strip(),
+        "title": f"{task.name} ({course.name.strip()})",
         "enum": [
             TaskStatus.COMPLETED.value,
             TaskStatus.SUBMITTED.value,
