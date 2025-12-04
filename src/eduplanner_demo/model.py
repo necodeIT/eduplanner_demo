@@ -1,11 +1,11 @@
-from enum import Enum
+from enum import StrEnum
 
 
 def toId(name: str) -> str:
     return name.lower().replace(" ", "_")
 
 
-class TaskStatus(Enum):
+class TaskStatus(StrEnum):
     """
     Enumeration representing the possible status values for a task.
     This enum defines the lifecycle states that a task can be in within the
@@ -80,7 +80,7 @@ class Course:
         self.tasks = tasks
 
 
-class Capability(Enum):
+class Capability(StrEnum):
     """
     Enumeration of user capabilities in the education planning system.
 
@@ -99,7 +99,7 @@ class Capability(Enum):
     SLOTMASTER = "slotmaster"
 
 
-class Clazz(Enum):
+class Clazz(StrEnum):
     """
     Enumeration representing class/grade levels in an educational system.
 
