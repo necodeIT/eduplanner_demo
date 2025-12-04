@@ -6,16 +6,17 @@
 		"default_target": "all",
 		"targets": [
 			{"name": "all", "build_cmd": "python3 -m hatch build"},
-			{"name": "schema", "build_cmd": "python3 -m hatch run python3 src/eduplanner_demo/autocomplete.py"}
+			{"name": "schema", "build_cmd": "python3 -m hatch run python3 -m eduplanner_demo schemagen -o ./src/schema/"}
 		]
 	},
 	"lspclient": {
 		"servers": {
 			"python" : {
+				"root": ".",
 				"settings": {
 					"pylsp": {
 						"plugins": {
-							"rope_autoimport": {
+							"rope_completion": {
 								"enabled": true
 							},
 							"mccabe": {

@@ -1,4 +1,4 @@
-from os.path import exists, expanduser, realpath, join as pathjoin
+from os.path import exists, isdir, expanduser, realpath, join as pathjoin
 import yaml
 import eduplanner_demo
 from eduplanner_demo.model import Task, Course, User, Capability, Clazz, TaskStatus, toId
@@ -11,6 +11,12 @@ class Config:
     def __init__(self, configdir: str | None = None):
         if configdir is None:
             configdir = self.find_configdir()
+        else:
+            configdir = realpath(configdir)
+            if not exists(configdir):
+                raise IOError(f"{configdir} does not exist")
+            elif not isdir(configdir):
+                raise IOError(f"{configdir} is not a directory")
 
         self.__configdir = configdir
 
