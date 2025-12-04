@@ -75,7 +75,7 @@ class Config:
 
                 task = next((task for task in tasks if task.id == toId(task_id)), None)
                 if task is not None:
-                    task_status[task] = TaskStatus(status)
+                    task_status[task.id] = TaskStatus(status)
 
             user = User(
                 name=user_data["name"],
@@ -139,8 +139,8 @@ def print_config(config: Config):
 |\t|\tClass: {user.clazz.value if user.clazz else 'N/A'}
 |\t|\tTasks:"""
         )
-        for task, status in user.task_status.items():
-            print(f"|\t|\t|\t{task.id}: '{status}'")
+        for task_id, status in user.task_status.items():
+            print(f"|\t|\t|\t{task_id}: '{status}'")
     print("Courses:")
     for course in courses:
         print(f"|\t{course.name}")
