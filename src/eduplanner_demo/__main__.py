@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from . import __version__
-from .config import Config
+from .config import Config, print_config
 from .schemagen import schemagen
 from argparse import ArgumentParser
 from enum import StrEnum, auto
@@ -9,6 +9,7 @@ from os.path import realpath
 
 class Commands(StrEnum):
 	SCHEMAGEN = auto()
+	SHOWCONFIG = auto()
 
 
 if __name__ == '__main__':
@@ -26,6 +27,8 @@ if __name__ == '__main__':
 	# schemagen
 	schemagen_parser = sp.add_parser(Commands.SCHEMAGEN, help="generate schemas for configs")
 	schemagen_parser.add_argument("-o", "--out", required=True, help="directory to put schema files in")
+	# showconfig
+	showconfig_parser = sp.add_parser(Commands.SHOWCONFIG, help="show current config")
 	
 	# read arguments
 	args = ap.parse_args()
@@ -35,5 +38,7 @@ if __name__ == '__main__':
 	match args.command:
 		case Commands.SCHEMAGEN:
 			schemagen(config.read_courses_config(), realpath(args.out))
+		case Commands.SHOWCONFIG:
+			print_config(config)
 		case _:
 			raise NotImplementedError("should be unreachable")

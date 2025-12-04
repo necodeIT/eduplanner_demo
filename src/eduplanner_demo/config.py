@@ -128,16 +128,27 @@ class Config:
         )
 
 
-if __name__ == "__main__":
-    config = Config()
+def print_config(config: Config):
     users, courses = config.read_moodle_config()
+    print("Users:")
     for user in users:
         print(
-            f"User: {user.name}, Capabilities: {[cap.value for cap in user.capabilities]}, Class: {user.clazz.value if user.clazz else 'N/A'}, Task Status: { {task.id: status.value for task, status in user.task_status.items()} }"
+            f"""\
+|\t{user.name}
+|\t|\tCapabilities: {[cap.value for cap in user.capabilities]}
+|\t|\tClass: {user.clazz.value if user.clazz else 'N/A'}
+|\t|\tTasks:"""
         )
+        for task, status in user.task_status.items():
+            print(f"|\t|\t|\t{task.id}: '{status}'")
+    print("Courses:")
     for course in courses:
-        print(f"Course: {course.name}")
+        print(f"|\t{course.name}")
+        print("|\t|\tTasks:")
         for task in course.tasks:
             print(
-                f"  Task: {task.name}, Due in: {task.due} days, Description: {task.description.strip()}, ID: {task.id}"
+                f"""\
+|\t|\t|\t{task.name} \033[2m({task.id})\033[0m
+|\t|\t|\t|\tDue in: {task.due} days
+|\t|\t|\t|\tDescription: {task.description.strip()}"""
             )
