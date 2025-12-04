@@ -1,12 +1,14 @@
 from eduplanner_demo.model import Capability, Clazz, TaskStatus
-from eduplanner_demo.config import read_courses_config
+from eduplanner_demo.config import Config
 from os.path import dirname, join as pathjoin
 from sys import exit
 
 if __name__ != "__main__":
     exit(1)
 
-courses = read_courses_config()
+config = Config()
+
+courses = config.read_courses_config()
 
 tasks = [task.id for course in courses for task in course.tasks]
 
