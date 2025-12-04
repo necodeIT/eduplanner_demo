@@ -21,6 +21,17 @@
 						}
 					}
 				}
+			},
+			"yaml": {
+				"root": ".",
+				"settings": {
+					"yaml": {
+						"schemas": {
+							"src/schema/users.yml.schema.json": "config/users.yml",
+							"src/schema/courses.yml.schema.json": "config/courses.yml"
+						}
+					}
+				}
 			}
 		}
 	}

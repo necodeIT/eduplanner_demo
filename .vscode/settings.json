@@ -1,9 +1,9 @@
 {
     "yaml.schemas": {
-        "schema/users.yml.schema.json": [
+        "src/schema/users.yml.schema.json": [
             "config/users.yml"
         ],
-        "schema/courses.yml.schema.json": [
+        "src/schema/courses.yml.schema.json": [
             "config/courses.yml"
         ]
     },
