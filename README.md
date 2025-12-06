@@ -4,6 +4,11 @@ This is a demo project for EduPlanner, an educational planning tool. The project
 
 ## Development Setup
 
+### Prerequisites
+
+- python-hatch: `pacman -S python-hatch`
+- python-build: `pacman -S python-build`
+
 ### Getting Started
 
 We're using hatchling - all you have to run is `python3 -m build` to build the package,
