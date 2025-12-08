@@ -21,6 +21,16 @@
 							},
 							"mccabe": {
 								"enabled": false
+							},
+							"pylsp_mypy": {
+								"enabled": true,
+								"overrides":  [
+									true,
+									"--strict-equality",
+									"--disallow-untyped-defs",
+									"--warn-return-any",
+									"--warn-unreachable"
+								]
 							}
 						}
 					}
