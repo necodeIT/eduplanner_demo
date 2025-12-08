@@ -9,7 +9,7 @@ from typing import Iterator
 from contextlib import contextmanager
 
 from .moodleadapter import MoodleAdapter, MoodleAdapterOpen
-from .model import Capability
+from .model import User as mUser
 
 class SCRIPTNAME(StrEnum):
 	MAINTENANCE = auto()
@@ -85,6 +85,27 @@ foreach ($alluserids as $userid) {{
 $allcourseids = $DB->get_fieldset('{DBTable.COURSES}', 'id');
 foreach ($allcourseids as $courseid) {{
 	delete_course($courseid, false);
+}}
+""")
+
+	def add_users(self, users: list[mUser]) -> None:
+		caplists = {user.name: ",".join([f"'{cap}'" for cap in user.capabilities]) for user in users}
+		clazzs = {user.name: f"'{user.clazz}'" if user.clazz is not None else 'null' for user in users}
+		data = ",".join([f"'{user.name}'=>['{user.token}',[{caplists[user.name]}],{clazzs[user.name]}]" for user in users])
+		self.__run_code(f"""\
+$tocreate = [{data}];
+
+$syscontext = context_system::instance(0, MUST_EXIST, false);
+
+foreach ($tocreate as $usrname => [$passwd, $capabilities, $clazz]) {{
+	$userid = create_user_record($usrname, $passwd)->id;
+	foreach ($capabilities as $capability) {{
+		$role = get_roles_with_capability($capability)[0];
+		role_assign($role->id, $userid, $syscontext);
+	}}
+	if ($clazz !== null)
+		$DB->set_field('{DBTable.USERS}', 'address', $clazz);
+	echo $userid;
 }}
 """)
 
