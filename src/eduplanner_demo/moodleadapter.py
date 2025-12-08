@@ -12,18 +12,13 @@ from .model import Task as mTask, User as mUser
 class MoodleAdapterOpen(ABC):
 	""" adapter to communicate with moodle - opened and ready for communication """
 	@abstractmethod
-	def clear_submissions(self) -> None:
-		""" clear all task submissions """
+	def clear(self) -> None:
+		""" clear everything """
 		...
 
 	@abstractmethod
 	def set_submissions(self, tasks: list[mTask], user: mUser) -> None:
 		""" add user submissions to all listed tasks """
-		...
-
-	@abstractmethod
-	def clear_users(self) -> None:
-		""" clear all users with eduplanner roles """
 		...
 
 	@abstractmethod
