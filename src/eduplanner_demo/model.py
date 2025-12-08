@@ -1,8 +1,24 @@
 from enum import StrEnum
 from dataclasses import dataclass
+from abc import ABC
 
 def toId(name: str) -> str:
     return name.lower().replace(" ", "_")
+
+class MoodleObject(ABC):
+    __slots__ = ("__moodleid",)
+    __moodleid: int | None
+
+    @property
+    def moodleid(self) -> int:
+        """ the moodle-internal ID this object has """
+        assert self.__moodleid is not None # TODO: proper exception
+        return self.__moodleid
+
+    @moodleid.setter
+    def moodleid(self, i: int) -> None:
+        assert self.__moodleid is None # TODO: proper exception
+        self.__moodleid = i
 
 
 class TaskStatus(StrEnum):
@@ -23,7 +39,7 @@ class TaskStatus(StrEnum):
 
 
 @dataclass
-class Task:
+class Task(MoodleObject):
     """
     A class representing a task in the education planner.
     """
@@ -44,7 +60,7 @@ class Task:
 
 
 @dataclass
-class Course:
+class Course(MoodleObject):
     """
     Represents a course with associated tasks.
 
@@ -102,7 +118,7 @@ class Clazz(StrEnum):
 
 
 @dataclass
-class User:
+class User(MoodleObject):
     """
     Represents a user in the educational planning system.
     """
