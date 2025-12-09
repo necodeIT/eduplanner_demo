@@ -11,6 +11,19 @@ from contextlib import contextmanager
 from .moodleadapter import MoodleAdapter, MoodleAdapterOpen
 from .model import User as mUser, Task as mTask, Course as mCourse
 
+#
+# NOTE: All of this essentially works by injecting php code into the moodle codebase (or if you wanna see it that way:
+#       importing the entire moodle codebase into some small php scripts) to abuse their internal functions because yup,
+#       that is indeed the easiest and most robust way of doing it.
+#
+# BEGIN TANGENT
+#       Maybe a custom plugin would be more "proper" but it would be much more effort, less performant, and exactly as
+#       robust - ranging from "not very" to "incredibly", depending on how you view the fact that moodle devs rarely
+#       touch their terrible undocumented internal functions.
+#       Either way, there might be a way to do it using the backup system, but knowing how fragile that is, I'll try
+#       that another time.
+# END
+
 class SCRIPTNAME(StrEnum):
 	MAINTENANCE = auto()
 	PURGE_CACHES = auto()
