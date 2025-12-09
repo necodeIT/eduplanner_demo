@@ -17,8 +17,8 @@ class MoodleAdapterOpen(ABC):
 		...
 
 	@abstractmethod
-	def set_submissions(self, tasks: list[mTask], user: mUser) -> None:
-		""" add user submissions to all listed tasks """
+	def add_submissions(self, tasks: list[mTask], user: mUser) -> None:
+		""" add user submissions to all listed tasks (NOTE: both user and tasks must have IDs set) """
 		...
 
 	@abstractmethod

@@ -9,7 +9,7 @@ from typing import Iterator
 from contextlib import contextmanager
 
 from .moodleadapter import MoodleAdapter, MoodleAdapterOpen
-from .model import User as mUser
+from .model import User as mUser, Task as mTask
 
 class SCRIPTNAME(StrEnum):
 	MAINTENANCE = auto()
@@ -30,6 +30,7 @@ class DBTable(StrEnum):
 	LBP_USERS = "local_lbplanner_users"
 	COURSES = "course"
 	USERS = "user"
+	SUBMISSIONS = "assign_submission"
 
 class MoodleCLI(MoodleAdapter):
 	""" Connects to a moodle instance via the CLI scripts """
@@ -107,6 +108,18 @@ foreach ($tocreate as $usrname => [$passwd, $capabilities, $clazz]) {{
 		$DB->set_field('{DBTable.USERS}', 'address', $clazz);
 	echo $userid;
 }}
+""")
+
+	def add_submissions(self, tasks: list[mTask], user: mUser) -> None:
+		data = ",".join([
+			f"['userid' => {user.moodleid}, 'assignment' => {task.moodleid}, 'status' => 'submitted', 'latest' => 1]"
+			for task in tasks
+		])
+		self.__run_code(f"""\
+$data = [
+	{data}
+];
+$DB->insert_records('{DBTable.SUBMISSIONS}', $data);
 """)
 
 	def __run_code(self, code: str, communicate: bool | str = False) -> str | None:
