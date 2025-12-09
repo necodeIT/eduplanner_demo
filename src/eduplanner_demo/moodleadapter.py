@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from typing import Iterator
+from collections.abc import Iterator, Collection
 
 from .model import Task as mTask, User as mUser, Course as mCourse
 
@@ -17,12 +17,12 @@ class MoodleAdapterOpen(ABC):
 		...
 
 	@abstractmethod
-	def add_courses(self, courses: list[mCourse]) -> None:
+	def add_courses(self, courses: Collection[mCourse]) -> None:
 		""" add courses (NOTE: sets moodleID for courses) """
 		...
 	
 	@abstractmethod
-	def add_tasks(self, courses: list[mCourse]) -> None:
+	def add_tasks(self, tasks: Collection[tuple[mCourse, mTask]]) -> None:
 		""" adds all tasks contained within these courses
 		
 		NOTE: sets moodleID for tasks
@@ -30,13 +30,13 @@ class MoodleAdapterOpen(ABC):
 		...
 
 	@abstractmethod
-	def add_submissions(self, tasks: list[mTask], user: mUser) -> None:
-		""" add user submissions to all listed tasks (NOTE: both user and tasks must have IDs set) """
+	def add_users(self, users: Collection[mUser]) -> None:
+		""" add users (NOTE: sets moodleID for users) """
 		...
 
 	@abstractmethod
-	def add_users(self, users: list[mUser]) -> None:
-		""" add users (NOTE: sets moodleID for users) """
+	def add_submissions(self, tasks: Collection[tuple[mUser, mTask]]) -> None:
+		""" add user submissions to all listed tasks (NOTE: both user and tasks must have IDs set) """
 		...
 
 

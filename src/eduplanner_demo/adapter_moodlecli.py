@@ -4,8 +4,7 @@ from pwd import getpwuid
 from functools import cached_property
 from subprocess import Popen, PIPE, DEVNULL
 from enum import StrEnum, auto
-from collections.abc import Iterable
-from typing import Iterator
+from collections.abc import Iterator, Iterable, Collection
 from contextlib import contextmanager
 
 from .moodleadapter import MoodleAdapter, MoodleAdapterOpen
@@ -106,7 +105,7 @@ foreach ($allcourseids as $courseid) {{
 }}
 """)
 
-	def add_users(self, users: list[mUser]) -> None:
+	def add_users(self, users: Iterable[mUser]) -> None:
 		caplists = {user.name: ",".join([f"'local/lb_planner:{cap}'" for cap in user.capabilities]) for user in users}
 		clazzs = {user.name: f"'{e(user.clazz)}'" if user.clazz is not None else 'null' for user in users}
 		data = ",".join([f"'{e(user.name)}'=>['{user.token}',[{caplists[user.name]}],{clazzs[user.name]}]" for user in users])
@@ -131,7 +130,7 @@ foreach ($tocreate as $usrname => [$passwd, $capabilities, $clazz]) {{
 		for user, userID in zip(users, userIDs):
 			user.moodleid = int(userID)
 
-	def add_courses(self, courses: list[mCourse]) -> None:
+	def add_courses(self, courses: Iterable[mCourse]) -> None:
 		data = ",".join([
 			f"['fullname' => '{e(course.name)}', 'shortname' => '{e(course.name)}', 'category' => $catid, 'idnumber' => '']"
 			for course in courses
@@ -151,8 +150,7 @@ foreach ($courses as $course) {{
 		for course, courseID in zip(courses, courseIDs):
 			course.moodleid = int(courseID)
 
-	def add_tasks(self, courses: list[mCourse]) -> None:
-		tasks: list[tuple[mCourse, mTask]] = [(course, task) for course in courses for task in course.tasks]
+	def add_tasks(self, tasks: Collection[tuple[mCourse, mTask]]) -> None:
 		assigns = ",".join([
 			f"""[
 				'name' => '{e(task.name)}',
@@ -175,10 +173,10 @@ foreach ($assigns as $assign) {{
 		for (course, task), taskID in zip(tasks, taskIDs):
 			task.moodleid = int(taskID)
 
-	def add_submissions(self, tasks: list[mTask], user: mUser) -> None:
+	def add_submissions(self, tasks: Iterable[tuple[mUser, mTask]]) -> None:
 		data = ",".join([
 			f"['userid' => {user.moodleid}, 'assignment' => {task.moodleid}, 'status' => 'submitted', 'latest' => 1]"
-			for task in tasks
+			for user, task in tasks
 		])
 		self.__run_code(f"""\
 $data = [
@@ -194,6 +192,7 @@ $DB->insert_records('{DBTable.SUBMISSIONS}', $data);
 		:param bool|str communicate: whether to communicate with the script - will be passed to stdin if string
 		:return str|None: stdout if communicate was true, None otherwise
 		"""
+		out: str | None
 		with self.__popen_code(code) as p:
 			if communicate:
 				out = p.communicate(communicate if isinstance(communicate, str) else None)[0].decode('utf-8')
@@ -226,6 +225,7 @@ require('${pathjoin(self.moodledir, 'config.php')}');
 		:param bool|str communicate: whether to communicate with the script - will be passed to stdin if string
 		:return str|None: stdout if communicate was true, None otherwise
 		"""
+		out: str | None
 		with self.__popen_script(name, params) as p:
 			if communicate:
 				out = p.communicate(communicate if isinstance(communicate, str) else None)[0].decode('utf-8')
