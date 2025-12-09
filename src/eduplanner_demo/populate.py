@@ -10,5 +10,6 @@ def populate(adapter: MoodleAdapterClosed, config: Config) -> None:
 		users, courses = config.read_moodle_config()
 		
 		mdl.add_courses(courses)
-		# TODO: set tasks
-		# TODO: set users and their accompanying data
+		mdl.add_tasks(courses)
+		mdl.add_users(users)
+		# TODO: set users' tasks

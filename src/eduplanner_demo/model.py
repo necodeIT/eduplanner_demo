@@ -1,6 +1,9 @@
 from enum import StrEnum
 from dataclasses import dataclass
 from abc import ABC
+from datetime import datetime, timedelta, UTC, timezone
+
+NOW = datetime.now(UTC)
 
 def toId(name: str) -> str:
     return name.lower().replace(" ", "_")
@@ -52,6 +55,11 @@ class Task(MoodleObject):
     """The time in days until the task is due. (relative to time of creation)"""
     description: str
     """A detailed description of the task."""
+
+    @property
+    def absdue(self, tz: timezone = UTC) -> int:
+        """ a UNIX timestamp corresponding to self.due """
+        return (int)((NOW.astimezone(tz) + timedelta(days=self.due)).timestamp())
 
     @property
     def id(self) -> str:

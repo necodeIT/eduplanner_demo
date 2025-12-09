@@ -138,6 +138,30 @@ foreach ($courses as $course) {{
 		for course, courseID in zip(courses, courseIDs):
 			course.moodleid = int(courseID)
 
+	def add_tasks(self, courses: list[mCourse]) -> None:
+		tasks: list[tuple[mCourse, mTask]] = [(course, task) for course in courses for task in course.tasks]
+		assigns = ",".join([
+			f"""[
+				'name' => '{e(task.name)}',
+				'description' => '{e(task.description)}',
+				'duedate' => {task.absdue},
+				'courseid' => {course.moodleid}
+			]""" for course, task in tasks
+		])
+		
+		stdout = self.__run_code(f"""\
+$assigns = [{assigns}];
+
+foreach ($assigns as $assign) {{
+	echo assign_add_instance((object)$assign);
+}}
+""", True)
+		assert stdout is not None
+		taskIDs = stdout.split('\n')
+		assert len(taskIDs) == len(tasks)
+		for (course, task), taskID in zip(tasks, taskIDs):
+			task.moodleid = int(taskID)
+
 	def add_submissions(self, tasks: list[mTask], user: mUser) -> None:
 		data = ",".join([
 			f"['userid' => {user.moodleid}, 'assignment' => {task.moodleid}, 'status' => 'submitted', 'latest' => 1]"

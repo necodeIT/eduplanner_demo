@@ -20,6 +20,14 @@ class MoodleAdapterOpen(ABC):
 	def add_courses(self, courses: list[mCourse]) -> None:
 		""" add courses (NOTE: sets moodleID for courses) """
 		...
+	
+	@abstractmethod
+	def add_tasks(self, courses: list[mCourse]) -> None:
+		""" adds all tasks contained within these courses
+		
+		NOTE: sets moodleID for tasks
+		NOTE: courses must have moodleID set """
+		...
 
 	@abstractmethod
 	def add_submissions(self, tasks: list[mTask], user: mUser) -> None:
