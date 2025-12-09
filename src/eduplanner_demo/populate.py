@@ -9,8 +9,21 @@ def populate(adapter: MoodleAdapterClosed, config: Config) -> None:
 
 		users, courses = config.read_moodle_config()
 		tasks = [(course, task) for course in courses for task in course.tasks]
+		tasks_bytaskname = {task[1].name: task[1] for task in tasks}
 		
 		mdl.add_courses(courses)
 		mdl.add_tasks(tasks)
 		mdl.add_users(users)
-		# TODO: set users' tasks
+		
+		submissions2add: list[tuple[User, Task]] = []
+		completions2add: list[tuple[User, Task]] = []
+		for user in users:
+			for name, status in user.task_status.items():
+				task = tasks_bytaskname[name]
+				if status in (TaskStatus.SUBMITTED, TaskStatus.COMPLETED):
+					submissions2add.append((user, task))
+				if status == TaskStatus.COMPLETED:
+					completions2add.append((user, task))
+			
+		mdl.add_submissions(submissions2add)
+		# TODO: add user's completions, however those work again
