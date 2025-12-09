@@ -41,7 +41,7 @@ class TaskStatus(StrEnum):
 @dataclass
 class Task(MoodleObject):
     """
-    A class representing a task in the education planner.
+    A class representing a moodle assignment.
     """
 
     name: str

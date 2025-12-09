@@ -32,6 +32,10 @@ class DBTable(StrEnum):
 	USERS = "user"
 	SUBMISSIONS = "assign_submission"
 
+def e(orig: str) -> str:
+	""" escapes strings so they can be used for inserting into php single-quoted strings """
+	return orig.replace('\\', '\\\\').replace('\'', "\\'") # should be good enough
+
 class MoodleCLI(MoodleAdapter):
 	""" Connects to a moodle instance via the CLI scripts """
 	__slots__ = ('moodledir', 'moodledata')
@@ -90,10 +94,10 @@ foreach ($allcourseids as $courseid) {{
 """)
 
 	def add_users(self, users: list[mUser]) -> None:
-		caplists = {user.name: ",".join([f"'{cap}'" for cap in user.capabilities]) for user in users}
-		clazzs = {user.name: f"'{user.clazz}'" if user.clazz is not None else 'null' for user in users}
-		data = ",".join([f"'{user.name}'=>['{user.token}',[{caplists[user.name]}],{clazzs[user.name]}]" for user in users])
-		self.__run_code(f"""\
+		caplists = {user.name: ",".join([f"'local/lb_planner:{cap}'" for cap in user.capabilities]) for user in users}
+		clazzs = {user.name: f"'{e(user.clazz)}'" if user.clazz is not None else 'null' for user in users}
+		data = ",".join([f"'{e(user.name)}'=>['{user.token}',[{caplists[user.name]}],{clazzs[user.name]}]" for user in users])
+		stdout = self.__run_code(f"""\
 $tocreate = [{data}];
 
 $syscontext = context_system::instance(0, MUST_EXIST, false);
@@ -108,7 +112,11 @@ foreach ($tocreate as $usrname => [$passwd, $capabilities, $clazz]) {{
 		$DB->set_field('{DBTable.USERS}', 'address', $clazz);
 	echo $userid;
 }}
-""")
+""", True)
+		assert stdout is not None
+		userIDs = stdout.split('\n')
+		for user, userID in zip(users, userIDs):
+			user.moodleid = int(userID)
 
 	def add_submissions(self, tasks: list[mTask], user: mUser) -> None:
 		data = ",".join([

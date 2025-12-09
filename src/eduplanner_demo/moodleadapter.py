@@ -23,7 +23,7 @@ class MoodleAdapterOpen(ABC):
 
 	@abstractmethod
 	def add_users(self, users: list[mUser]) -> None:
-		""" add users """
+		""" add users (NOTE: sets moodleID for users) """
 		...
 
 
