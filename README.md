@@ -22,7 +22,7 @@ The course and task configurations are located in the `config/courses.yml` file.
 
 You can use the provided docker-compose setup to run test containers for a moodle test server and mariadb instance.
 
-Run the following commands to start the containers:
+Run the following commands to start the containers (or alternatively use `./up.sh`):
 
 ```bash
 mkdir -p .dev/mariadb_data
@@ -30,7 +30,7 @@ sudo chmod -R 777 .dev/mariadb_data
 docker-compose up -d
 ```
 
-To whipe the installation, you can run:
+To whipe the installation, you can run the following commands (or alternatively use `./destroy.sh`):
 
 ```bash
 docker-compose down
