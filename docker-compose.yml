@@ -1,0 +1,38 @@
+# Docker Compose file for Moodle and MariaDB
+# for development purposes only. Do not use in production environments.
+services:
+  mariadb:
+    image: bitnami/mariadb:latest
+    environment:
+      - MARIADB_USER=bn_moodle
+      - MARIADB_PASSWORD=bn_moodle
+      - MARIADB_DATABASE=bitnami_moodle
+      - MARIADB_CHARACTER_SET=utf8mb4
+      - MARIADB_COLLATE=utf8mb4_unicode_ci
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - "./.dev/mariadb_data:/bitnami/mariadb"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  moodle:
+    image: bitnami/moodle:latest
+    ports:
+      - "420:8080"
+    environment:
+      - MOODLE_DATABASE_HOST=mariadb
+      - MOODLE_DATABASE_PORT_NUMBER=3306
+      - MOODLE_DATABASE_USER=bn_moodle
+      - MOODLE_DATABASE_PASSWORD=bn_moodle
+      - MOODLE_DATABASE_NAME=bitnami_moodle
+      - MOODLE_USERNAME=admin
+      - MOODLE_PASSWORD=test
+      - ALLOW_EMPTY_PASSWORD=yes
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    volumes:
+      - "./.dev/moodle_data:/bitnami/moodle"
+      - "./.dev/moodledata_data:/bitnami/moodledata"
