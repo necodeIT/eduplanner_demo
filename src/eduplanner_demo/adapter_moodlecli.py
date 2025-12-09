@@ -9,7 +9,7 @@ from typing import Iterator
 from contextlib import contextmanager
 
 from .moodleadapter import MoodleAdapter, MoodleAdapterOpen
-from .model import User as mUser, Task as mTask
+from .model import User as mUser, Task as mTask, Course as mCourse
 
 class SCRIPTNAME(StrEnum):
 	MAINTENANCE = auto()
@@ -117,6 +117,26 @@ foreach ($tocreate as $usrname => [$passwd, $capabilities, $clazz]) {{
 		userIDs = stdout.split('\n')
 		for user, userID in zip(users, userIDs):
 			user.moodleid = int(userID)
+
+	def add_courses(self, courses: list[mCourse]) -> None:
+		data = ",".join([
+			f"['fullname' => '{e(course.name)}', 'shortname' => '{e(course.name)}', 'category' => $catid, 'idnumber' => '']"
+			for course in courses
+		])
+		stdout = self.__run_code(f"""\
+$catid = core_course_category::get_default()->id;
+$courses = [
+	{data}
+];
+
+foreach ($courses as $course) {{
+	echo create_course((object)$course)->id;
+}}
+""", True)
+		assert stdout is not None
+		courseIDs = stdout.split('\n')
+		for course, courseID in zip(courses, courseIDs):
+			course.moodleid = int(courseID)
 
 	def add_submissions(self, tasks: list[mTask], user: mUser) -> None:
 		data = ",".join([

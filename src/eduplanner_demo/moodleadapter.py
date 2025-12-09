@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from typing import Iterator
 
-from .model import Task as mTask, User as mUser
+from .model import Task as mTask, User as mUser, Course as mCourse
 
 #
 # NOTE: MoodleAdapterOpen and MoodleAdapter are normally the same object,
@@ -14,6 +14,11 @@ class MoodleAdapterOpen(ABC):
 	@abstractmethod
 	def clear(self) -> None:
 		""" clear everything """
+		...
+
+	@abstractmethod
+	def add_courses(self, courses: list[mCourse]) -> None:
+		""" add courses (NOTE: sets moodleID for courses) """
 		...
 
 	@abstractmethod
