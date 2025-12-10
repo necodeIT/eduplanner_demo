@@ -47,7 +47,7 @@ class DBTable(StrEnum):
 
 def e(orig: str) -> str:
 	""" escapes strings so they can be used for inserting into php single-quoted strings """
-	return orig.replace('\\', '\\\\').replace('\'', "\\'") # should be good enough
+	return orig.replace('\\', '\\\\').replace('\'', "\\'").strip() # should be good enough
 
 class MoodleCLI(MoodleAdapter):
 	""" Connects to a moodle instance via the CLI scripts """
@@ -120,15 +120,15 @@ foreach ($tocreate as $usrname => [$passwd, $capabilities, $clazz]) {{
 	}}
 	if ($clazz !== null)
 		$DB->set_field('{DBTable.USERS}', 'address', $clazz);
-	echo $userid;
+	echo $userid . "\\0";
 }}
 """, True)
 		assert stdout is not None
-		userIDs = stdout.split('\n')
+		userIDs = stdout[:-1].split('\0')
 		for user, userID in zip(users, userIDs):
 			user.moodleid = int(userID)
 
-	def add_courses(self, courses: Iterable[mCourse]) -> None:
+	def add_courses(self, courses: Collection[mCourse]) -> None:
 		data = ",".join([
 			f"['fullname' => '{e(course.name)}', 'shortname' => '{e(course.name)}', 'category' => $catid, 'idnumber' => '']"
 			for course in courses
@@ -140,11 +140,13 @@ $courses = [
 ];
 
 foreach ($courses as $course) {{
-	echo create_course((object)$course)->id;
+	echo create_course((object)$course)->id . "\\0";
 }}
-""", True)
+""", True, ['course/lib'])
 		assert stdout is not None
-		courseIDs = stdout.split('\n')
+		courseIDs = stdout[:-1].split('\0')[:]
+		print(courseIDs)
+		assert len(courseIDs) == len(courses)
 		for course, courseID in zip(courses, courseIDs):
 			course.moodleid = int(courseID)
 
@@ -154,7 +156,8 @@ foreach ($courses as $course) {{
 				'name' => '{e(task.name)}',
 				'description' => '{e(task.description)}',
 				'duedate' => {task.absdue},
-				'courseid' => {course.moodleid}
+				'courseid' => {course.moodleid},
+				'modulename' => 'assign'
 			]""" for course, task in tasks
 		])
 		
@@ -162,11 +165,16 @@ foreach ($courses as $course) {{
 $assigns = [{assigns}];
 
 foreach ($assigns as $assign) {{
-	echo assign_add_instance((object)$assign);
+	$course = get_course($assign['courseid']);
+	[$module, $context, $cw, $cm, $data] = prepare_new_moduleinfo_data($course, 'assign', 1);
+	$data->name = $assign->name;
+	$data->description = $assign->description;
+	$data->duedate = $assign->duedate;
+	echo add_moduleinfo((object)$data, $course)->instance . "\\0";
 }}
-""", True)
+""", True, ["course/modlib", "lib/datalib"])
 		assert stdout is not None
-		taskIDs = stdout.split('\n')
+		taskIDs = stdout[:-1].split('\0')
 		assert len(taskIDs) == len(tasks)
 		for (course, task), taskID in zip(tasks, taskIDs):
 			task.moodleid = int(taskID)
@@ -202,15 +210,16 @@ foreach ($assigns as [$userid, $assignid]) {{
 }}
 """)
 
-	def __run_code(self, code: str, communicate: bool | str = False) -> str | None:
+	def __run_code(self, code: str, communicate: bool | str = False, imports: Iterable[str] = []) -> str | None:
 		""" Popens code and stuff
 
 		:param str code: the php code to execute
 		:param bool|str communicate: whether to communicate with the script - will be passed to stdin if string
 		:return str|None: stdout if communicate was true, None otherwise
 		"""
+		print("imports:", imports)
 		out: str | None
-		with self.__popen_code(code) as p:
+		with self.__popen_code(code, imports) as p:
 			if communicate:
 				out = p.communicate(communicate if isinstance(communicate, str) else None)[0].decode('utf-8')
 			else:
@@ -219,19 +228,32 @@ foreach ($assigns as [$userid, $assignid]) {{
 		
 		return out
 
-	def __popen_code(self, code: str) -> Popen:
+	def __popen_code(self, code: str, imports: Iterable[str] = []) -> Popen:
 		""" Popens custom php code with moodle context
 
 		:param str code: the php code to execute
 		:return Popen: the running process
 		"""
-		bootstrap = f"""\
+		
+		imports = ['config', *imports]
+		
+		bootstrap = """\
 define('CLI_SCRIPT', true);
-require('{pathjoin(self.moodledir, 'config.php')}');
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+error_reporting(E_ALL);
 """
+		
+		for i in imports:
+			# TODO: check if file exists for better exception reporting
+			fn = f"{i}.php"
+			bootstrap += f"require_once('{pathjoin(self.moodledir, fn)}');"
+		
+		print(toexecute := f"{bootstrap}{code}")
+		
 		return Popen(
-			["php", '-r', f"{bootstrap}{code}", '--'],
-			stdout=PIPE, stderr=DEVNULL
+			["php", '-r', toexecute, '--'],
+			stdout=PIPE
 		)
 
 	def __run_script(self, name: SCRIPTNAME, params: Iterable[str], communicate: bool | str = False) -> str | None:
@@ -261,7 +283,7 @@ require('{pathjoin(self.moodledir, 'config.php')}');
 		"""
 		return Popen(
 			["php", '-f', pathjoin(self.script_folder, f"{name}.php"), '--', *params],
-			stdout=PIPE, stderr=DEVNULL
+			stdout=PIPE
 		)
 	
 	@cached_property

@@ -9,19 +9,18 @@ def toId(name: str) -> str:
     return name.lower().replace(" ", "_")
 
 class MoodleObject(ABC):
-    __slots__ = ("__moodleid",)
-    __moodleid: int | None
+    moodleid_: int | None = None # TODO: figure out a way to do this with a proper private variable and such
 
     @property
     def moodleid(self) -> int:
         """ the moodle-internal ID this object has """
-        assert self.__moodleid is not None # TODO: proper exception
-        return self.__moodleid
+        assert self.moodleid_ is not None # TODO: proper exception
+        return self.moodleid_
 
     @moodleid.setter
     def moodleid(self, i: int) -> None:
-        assert self.__moodleid is None # TODO: proper exception
-        self.__moodleid = i
+        assert self.moodleid_ is None # TODO: proper exception
+        self.moodleid_ = i
 
 
 class TaskStatus(StrEnum):
