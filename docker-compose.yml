@@ -18,7 +18,10 @@ services:
       timeout: 5s
       retries: 5
   moodle:
-    image: bitnami/moodle:latest
+    image: pallasys/eduplanner-demo:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "420:8080"
     environment:
@@ -36,3 +39,4 @@ services:
     volumes:
       - "./.dev/moodle_data:/bitnami/moodle"
       - "./.dev/moodledata_data:/bitnami/moodledata"
+      - "./src:/pallasys/cli/src"

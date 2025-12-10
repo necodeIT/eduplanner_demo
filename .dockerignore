@@ -1,0 +1,6 @@
+destroy.sh
+up.sh
+__pycache__/
+dist/
+.dev/
+Dockerfile

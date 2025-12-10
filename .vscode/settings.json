@@ -15,5 +15,14 @@
             }
         ]
     },
-    "python-envs.pythonProjects": []
+    "[python]": {
+        "editor.formatOnSave": false,
+        "editor.formatOnType": false,
+        "editor.formatOnPaste": false
+    },
+    "[php]": {
+        "editor.formatOnSave": false,
+        "editor.formatOnType": false,
+        "editor.formatOnPaste": false
+    }
 }
