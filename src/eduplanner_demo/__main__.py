@@ -2,6 +2,8 @@
 from . import __version__
 from .config import Config, print_config
 from .schemagen import schemagen
+from .adapter_moodlecli import MoodleCLI
+from .populate import populate
 from argparse import ArgumentParser
 from enum import StrEnum, auto
 from pathlib import Path
@@ -10,6 +12,7 @@ from os.path import realpath
 class Commands(StrEnum):
 	SCHEMAGEN = auto()
 	SHOWCONFIG = auto()
+	POPULATE = auto()
 
 
 if __name__ == '__main__':
@@ -29,6 +32,20 @@ if __name__ == '__main__':
 	schemagen_parser.add_argument("-o", "--out", required=True, help="directory to put schema files in")
 	# showconfig
 	showconfig_parser = sp.add_parser(Commands.SHOWCONFIG, help="show current config")
+	# populate
+	populate_parser = sp.add_parser(Commands.SHOWCONFIG, help="reset and populate database")
+	populate_parser.add_argument(
+		"--moodledir",
+		required=True,
+		type=Path,
+		help="directory where moodle is installed (e.g. /bitnami/moodle/)"
+	)
+	populate_parser.add_argument(
+		"--moodledata",
+		required=True,
+		type=Path,
+		help="directory where moodledata is located (e.g. /bitnami/moodledata/)"
+	)
 	
 	# read arguments
 	args = ap.parse_args()
@@ -40,5 +57,8 @@ if __name__ == '__main__':
 			schemagen(config.read_courses_config(), realpath(args.out))
 		case Commands.SHOWCONFIG:
 			print_config(config)
+		case Commands.POPULATE:
+			moodle_adapter = MoodleCLI(args.moodledir, args.moodledata)
+			populate(moodle_adapter, config)
 		case _:
 			raise NotImplementedError("should be unreachable")
