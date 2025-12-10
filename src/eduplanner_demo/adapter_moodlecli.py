@@ -95,6 +95,9 @@ $DB->delete_records("{DBTable.LBP_USERS}");
 
 $alluserids = $DB->get_fieldset('{DBTable.USERS}', 'id');
 foreach ($alluserids as $userid) {{
+	if ($userid === 1 || $userid === 2) {{
+		continue;
+	}}
 	delete_user($DB->get_record('user', ['id' => $userid]));
 }}
 $allcourseids = $DB->get_fieldset('{DBTable.COURSES}', 'id');
