@@ -62,7 +62,7 @@ class MoodleCLI(MoodleAdapter):
 	@contextmanager
 	def connect(self) -> Iterator[MoodleAdapterOpen]:
 		if self.exec_uid != getuid():
-			raise OSError(f"Must run as f{getpwuid(self.exec_uid).pw_name}, f{getpwuid(getuid()).pw_name} instead")
+			raise OSError(f"Must run as {getpwuid(self.exec_uid).pw_name}, {getpwuid(getuid()).pw_name} instead")
 		
 		self.enable_maintenance()
 		try:
