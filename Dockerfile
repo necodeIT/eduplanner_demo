@@ -1,4 +1,4 @@
-FROM bitnami/moodle:latest
+FROM bitnamilegacy/moodle:latest
 
 
 RUN apt-get update
