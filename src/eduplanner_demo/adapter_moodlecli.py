@@ -95,7 +95,7 @@ $DB->delete_records("{DBTable.LBP_USERS}");
 
 $alluserids = $DB->get_fieldset('{DBTable.USERS}', 'id');
 foreach ($alluserids as $userid) {{
-	if ($userid === 1 || $userid === 2) {{
+	if ($userid == 1 || $userid == 2) {{
 		continue;
 	}}
 	delete_user($DB->get_record('user', ['id' => $userid]));
@@ -167,12 +167,14 @@ foreach ($courses as $course) {{
 		stdout = self.__run_code(f"""\
 $assigns = [{assigns}];
 
+$USER->id = 2;
+
 foreach ($assigns as $assign) {{
 	$course = get_course($assign['courseid']);
 	[$module, $context, $cw, $cm, $data] = prepare_new_moduleinfo_data($course, 'assign', 1);
-	$data->name = $assign->name;
-	$data->description = $assign->description;
-	$data->duedate = $assign->duedate;
+	$data->name = $assign['name'];
+	$data->description = $assign['description'];
+	$data->duedate = $assign['duedate'];
 	echo add_moduleinfo((object)$data, $course)->instance . "\\0";
 }}
 """, True, ["course/modlib", "lib/datalib"])
