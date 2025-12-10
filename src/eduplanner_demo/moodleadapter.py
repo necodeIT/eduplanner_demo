@@ -38,6 +38,11 @@ class MoodleAdapterOpen(ABC):
 	def add_submissions(self, tasks: Collection[tuple[mUser, mTask]]) -> None:
 		""" add user submissions to all listed tasks (NOTE: both user and tasks must have IDs set) """
 		...
+	
+	@abstractmethod
+	def add_grades(self, tasks: Collection[tuple[mUser, mTask]]) -> None:
+		""" sets full-mark grades for the passed tasks """
+		...
 
 
 class MoodleAdapterClosed(ABC):

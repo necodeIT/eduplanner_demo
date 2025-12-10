@@ -26,4 +26,4 @@ def populate(adapter: MoodleAdapterClosed, config: Config) -> None:
 					completions2add.append((user, task))
 			
 		mdl.add_submissions(submissions2add)
-		# TODO: add user's completions, however those work again
+		mdl.add_grades(completions2add)

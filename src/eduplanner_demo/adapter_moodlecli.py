@@ -43,6 +43,7 @@ class DBTable(StrEnum):
 	COURSES = "course"
 	USERS = "user"
 	SUBMISSIONS = "assign_submission"
+	GRADES = "assign_grades"
 
 def e(orig: str) -> str:
 	""" escapes strings so they can be used for inserting into php single-quoted strings """
@@ -183,6 +184,25 @@ $data = [
 	{data}
 ];
 $DB->insert_records('{DBTable.SUBMISSIONS}', $data);
+""")
+
+	def add_grades(self, tasks: Iterable[tuple[mUser, mTask]]) -> None:
+		
+		assigns = ",".join([f"[{user.moodleid}, {task.moodleid}]" for user, task in tasks])
+		
+		self.__run_code(f"""\
+$assigns = [
+	{assigns}
+];
+
+foreach ($assigns as [$userid, $assignid]) {{
+	$cm = get_coursemodule_from_instance('assign', $assignid, 0, false, MUST_EXIST);
+	$context = context_module::instance($cm->id);
+	$assignment = new assign($context, $cm, null);
+	$grade = $assignment->get_user_grade($userid, true, 1);
+	$grade->grade = '100';
+	$assignment->update_grade($grade);
+}}
 """)
 
 	def __run_code(self, code: str, communicate: bool | str = False) -> str | None:
