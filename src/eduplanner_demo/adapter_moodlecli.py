@@ -227,7 +227,7 @@ foreach ($assigns as [$userid, $assignid]) {{
 		"""
 		bootstrap = f"""\
 define('CLI_SCRIPT', true);
-require('${pathjoin(self.moodledir, 'config.php')}');
+require('{pathjoin(self.moodledir, 'config.php')}');
 """
 		return Popen(
 			["php", '-r', f"{bootstrap}{code}", '--'],
