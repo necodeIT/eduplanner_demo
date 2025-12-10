@@ -33,18 +33,12 @@ if __name__ == '__main__':
 	# showconfig
 	showconfig_parser = sp.add_parser(Commands.SHOWCONFIG, help="show current config")
 	# populate
-	populate_parser = sp.add_parser(Commands.SHOWCONFIG, help="reset and populate database")
+	populate_parser = sp.add_parser(Commands.POPULATE, help="reset and populate database")
 	populate_parser.add_argument(
 		"--moodledir",
 		required=True,
 		type=Path,
 		help="directory where moodle is installed (e.g. /bitnami/moodle/)"
-	)
-	populate_parser.add_argument(
-		"--moodledata",
-		required=True,
-		type=Path,
-		help="directory where moodledata is located (e.g. /bitnami/moodledata/)"
 	)
 	
 	# read arguments
@@ -58,7 +52,7 @@ if __name__ == '__main__':
 		case Commands.SHOWCONFIG:
 			print_config(config)
 		case Commands.POPULATE:
-			moodle_adapter = MoodleCLI(args.moodledir, args.moodledata)
+			moodle_adapter = MoodleCLI(args.moodledir)
 			populate(moodle_adapter, config)
 		case _:
 			raise NotImplementedError("should be unreachable")

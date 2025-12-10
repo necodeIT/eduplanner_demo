@@ -51,16 +51,13 @@ def e(orig: str) -> str:
 
 class MoodleCLI(MoodleAdapter):
 	""" Connects to a moodle instance via the CLI scripts """
-	__slots__ = ('moodledir', 'moodledata')
+	__slots__ = ('moodledir')
 
 	moodledir: str
 	""" where moodle is located """
-	moodledata: str # TODO: check if needed
-	""" where moodledata is located """
 	
-	def __init__(self, moodledir: str, moodledata: str):
+	def __init__(self, moodledir: str):
 		self.moodledir = realpath(moodledir)
-		self.moodledata = realpath(moodledata)
 	
 	@contextmanager
 	def connect(self) -> Iterator[MoodleAdapterOpen]:
