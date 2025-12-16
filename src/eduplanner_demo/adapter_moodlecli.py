@@ -174,8 +174,22 @@ foreach ($assigns as $assign) {{
 	[$module, $context, $cw, $cm, $data] = prepare_new_moduleinfo_data($course, 'assign', 1);
 	$data->name = $assign['name'];
 	$data->description = $assign['description'];
-	$data->duedate = $assign['duedate'];
-	echo add_moduleinfo((object)$data, $course)->instance . "\\0";
+	$data->gradingduedate = $data->cutoffdate = $data->duedate = $assign['duedate'];
+	// setting bullshit needed by some internal function that has zero effect but we need to set it anyway because ????
+	$data->submissiondrafts
+		= $data->requiresubmissionstatement
+		= $data->sendnotifications
+		= $data->sendlatenotifications
+		= $data->grade
+		= $data->allowsubmissionsfromdate
+		= $data->teamsubmission
+		= $data->requireallteammemberssubmit
+		= $data->blindmarking
+		= $data->markingworkflow
+		= $data->markingallocation
+		= false;
+	// setting module and returning assignid
+	echo add_moduleinfo($data, $course)->instance . "\\0";
 }}
 """, True, ["course/modlib", "lib/datalib"])
 		assert stdout is not None
