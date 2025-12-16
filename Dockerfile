@@ -12,6 +12,7 @@ WORKDIR /pallasys/cli
 RUN python3 -m build
 RUN mkdir -p /home/daemon
 RUN chown daemon:daemon /home/daemon
+RUN usermod -d /home/daemon daemon
 
 WORKDIR /
 
