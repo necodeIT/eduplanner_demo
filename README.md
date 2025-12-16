@@ -36,3 +36,14 @@ To whipe the installation, you can run the following commands (or alternatively 
 docker-compose down
 sudo rm -rf .dev
 ```
+
+### Preparing your Moodle Instance
+
+TODO: automate these processes
+
+Before you can run the demo script, you need to
+
+- install the [eduplanner plugin](https://github.com/necodeIT/lb_planner_plugin/)
+- create roles for the included capabilities (student, teacher, slotmaster)
+
+after this, the script should be able to handle everything itself.
