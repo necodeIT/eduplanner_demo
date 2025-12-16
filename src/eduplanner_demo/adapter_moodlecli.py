@@ -118,8 +118,8 @@ $syscontext = context_system::instance(0, MUST_EXIST, false);
 foreach ($tocreate as $usrname => [$passwd, $capabilities, $clazz]) {{
 	$userid = create_user_record($usrname, $passwd)->id;
 	foreach ($capabilities as $capability) {{
-		$role = get_roles_with_capability($capability)[0];
-		role_assign($role->id, $userid, $syscontext);
+		$roles = get_roles_with_capability($capability);
+		role_assign(array_key_first($roles), $userid, $syscontext);
 	}}
 	if ($clazz !== null)
 		$DB->set_field('{DBTable.USERS}', 'address', $clazz);
