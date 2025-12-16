@@ -109,7 +109,7 @@ foreach ($allcourseids as $courseid) {{
 	def add_users(self, users: Iterable[mUser]) -> None:
 		caplists = {user.name: ",".join([f"'local/lb_planner:{cap}'" for cap in user.capabilities]) for user in users}
 		clazzs = {user.name: f"'{e(user.clazz)}'" if user.clazz is not None else 'null' for user in users}
-		data = ",".join([f"'{e(user.name)}'=>['{user.token}',[{caplists[user.name]}],{clazzs[user.name]}]" for user in users])
+		data = ",".join([f"'{e(user.name.replace(' ', '_'))}'=>['{user.token}',[{caplists[user.name]}],{clazzs[user.name]}]" for user in users])
 		stdout = self.__run_code(f"""\
 $tocreate = [{data}];
 
