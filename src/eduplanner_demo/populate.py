@@ -9,7 +9,7 @@ def populate(adapter: MoodleAdapterClosed, config: Config) -> None:
 
 		users, courses = config.read_moodle_config()
 		tasks = [(course, task) for course in courses for task in course.tasks]
-		tasks_bytaskname = {task[1].name: task[1] for task in tasks}
+		tasks_bytaskname = {task[1].id: task[1] for task in tasks}
 		
 		mdl.add_courses(courses)
 		mdl.add_tasks(tasks)
