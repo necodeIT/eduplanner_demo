@@ -2,7 +2,7 @@ from os import stat, getuid
 from os.path import realpath, join as pathjoin
 from pwd import getpwuid
 from functools import cached_property
-from subprocess import Popen, PIPE, DEVNULL
+from subprocess import Popen, PIPE
 from enum import StrEnum, auto
 from collections.abc import Iterator, Iterable, Collection
 from contextlib import contextmanager
@@ -79,7 +79,7 @@ class MoodleCLI(MoodleAdapter):
 		self.__run_script(SCRIPTNAME.MAINTENANCE, ("--disable",))
 	
 	def clear(self) -> None:
-		self.__run_code(f"""\
+		self.__run_code(f"""
 $DB->delete_records("{DBTable.LBP_NOTIFICATIONS}");
 $DB->delete_records("{DBTable.LBP_RESERVATIONS}");
 $DB->delete_records("{DBTable.LBP_SLOTFILTERS}");
@@ -128,7 +128,7 @@ foreach ($allcourseids as $courseid) {{
 			f"['{user.token}',[{caplists[user.name]}],{clazzs[user.name]},'{e(firstnames[user.name])}','{e(lastnames[user.name])}']"
 			for user in users
 		])
-		stdout = self.__run_code(f"""\
+		stdout = self.__run_code(f"""
 $tocreate = [{data}];
 
 $syscontext = context_system::instance(0, MUST_EXIST, false);
@@ -157,7 +157,7 @@ foreach ($tocreate as $usrname => [$passwd, $capabilities, $clazz, $firstname, $
 			f"['fullname' => '{e(course.name)}', 'shortname' => '{e(course.name)}', 'category' => $catid, 'idnumber' => '']"
 			for course in courses
 		])
-		stdout = self.__run_code(f"""\
+		stdout = self.__run_code(f"""
 $catid = core_course_category::get_default()->id;
 $courses = [
 	{data}
@@ -200,7 +200,7 @@ foreach ($courses as $courseid) {{
 			]""" for course, task in tasks
 		])
 		
-		stdout = self.__run_code(f"""\
+		stdout = self.__run_code(f"""
 $assigns = [{assigns}];
 
 $USER->id = 2;
@@ -239,7 +239,7 @@ foreach ($assigns as $assign) {{
 			f"['userid' => {user.moodleid}, 'assignment' => {task.moodleid}, 'status' => 'submitted', 'latest' => 1]"
 			for user, task in tasks
 		])
-		self.__run_code(f"""\
+		self.__run_code(f"""
 $data = [
 	{data}
 ];
@@ -250,7 +250,7 @@ $DB->insert_records('{DBTable.SUBMISSIONS}', $data);
 		
 		assigns = ",".join([f"[{user.moodleid}, {task.moodleid}]" for user, task in tasks])
 		
-		self.__run_code(f"""\
+		self.__run_code(f"""
 $assigns = [
 	{assigns}
 ];

@@ -1,4 +1,4 @@
-from .model import Capability, Clazz, Course, Task, TaskStatus, User
+from .model import Task, TaskStatus, User
 from .config import Config
 from .moodleadapter import MoodleAdapterClosed
 
