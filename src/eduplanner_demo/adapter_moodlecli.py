@@ -109,20 +109,41 @@ foreach ($allcourseids as $courseid) {{
 	def add_users(self, users: Iterable[mUser]) -> None:
 		caplists = {user.name: ",".join([f"'local/lb_planner:{cap}'" for cap in user.capabilities]) for user in users}
 		clazzs = {user.name: f"'{e(user.clazz)}'" if user.clazz is not None else 'null' for user in users}
-		data = ",".join([f"'{e(user.name.replace(' ', '_'))}'=>['{user.token}',[{caplists[user.name]}],{clazzs[user.name]}]" for user in users])
+		firstnames = {}
+		lastnames = {}
+		
+		for user in users:
+			splitpoint = user.name.rfind(' ')
+			
+			if splitpoint == -1:
+				firstnames[user.name] = user.name
+				lastnames[user.name] = ''
+				continue
+			
+			firstnames[user.name] = user.name[:splitpoint]
+			lastnames[user.name] = user.name[splitpoint + 1:]
+		
+		data = ",".join([
+			f"'{e(user.name.replace(' ', '_'))}'=>"
+			f"['{user.token}',[{caplists[user.name]}],{clazzs[user.name]},'{e(firstnames[user.name])}','{e(lastnames[user.name])}']"
+			for user in users
+		])
 		stdout = self.__run_code(f"""\
 $tocreate = [{data}];
 
 $syscontext = context_system::instance(0, MUST_EXIST, false);
 
-foreach ($tocreate as $usrname => [$passwd, $capabilities, $clazz]) {{
+foreach ($tocreate as $usrname => [$passwd, $capabilities, $clazz, $firstname, $lastname]) {{
 	$userid = create_user_record($usrname, $passwd)->id;
 	foreach ($capabilities as $capability) {{
 		$roles = get_roles_with_capability($capability);
 		role_assign(array_key_first($roles), $userid, $syscontext);
 	}}
 	if ($clazz !== null)
-		$DB->set_field('{DBTable.USERS}', 'address', $clazz);
+		$DB->set_field('user', 'address', $clazz, ['id' => $userid]);
+	$DB->set_field('user', 'firstname', $firstname, ['id' => $userid]);
+	$DB->set_field('user', 'lastname', $lastname, ['id' => $userid]);
+	$DB->set_field('user', 'email', "user{{$userid}}@example.com", ['id' => $userid]);
 	echo $userid . "\\0";
 }}
 """, True)
