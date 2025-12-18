@@ -187,11 +187,12 @@ foreach ($courses as $course) {{
 $courses = [{data}];
 $userid = {user.moodleid};
 
+$studentrole = $DB->get_record('role', ['archetype'=>'student']);
 $enrolplugin = enrol_get_plugin('manual');
 
 foreach ($courses as $courseid) {{
 	$instance = $DB->get_record('enrol', ['courseid' => $courseid, 'enrol' => 'manual']);
-	$enrolplugin->enrol_user($instance, $userid);
+	$enrolplugin->enrol_user($instance, $userid, $studentrole->id);
 }}
 """)
 
