@@ -98,7 +98,13 @@ foreach ($alluserids as $userid) {{
 	if ($userid == 1 || $userid == 2) {{
 		continue;
 	}}
-	delete_user($DB->get_record('user', ['id' => $userid]));
+	
+	// sometimes during testing the user table will corrupt. this will safely leak memory in that case.
+	try {{
+		delete_user($DB->get_record('user', ['id' => $userid]));
+	}} catch (dml_missing_record_exception) {{
+		$DB->delete_records('{DBTable.USERS}', ['id' => $userid]);
+	}}
 }}
 $allcourseids = $DB->get_fieldset('{DBTable.COURSES}', 'id');
 foreach ($allcourseids as $courseid) {{
