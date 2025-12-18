@@ -35,6 +35,11 @@ class MoodleAdapterOpen(ABC):
 		...
 
 	@abstractmethod
+	def add_user_enrols(self, user: mUser, courses: Collection[mCourse]) -> None:
+		""" enrol user in courses """
+		...
+
+	@abstractmethod
 	def add_submissions(self, tasks: Collection[tuple[mUser, mTask]]) -> None:
 		""" add user submissions to all listed tasks (NOTE: both user and tasks must have IDs set) """
 		...

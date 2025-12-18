@@ -9,7 +9,9 @@ def populate(adapter: MoodleAdapterClosed, config: Config) -> None:
 
 		users, courses = config.read_moodle_config()
 		tasks = [(course, task) for course in courses for task in course.tasks]
+		course_bytaskname = {task.id: course for course, task in tasks}
 		tasks_bytaskname = {task[1].id: task[1] for task in tasks}
+		courses_byusername = {user.name: [course_bytaskname[taskname] for taskname in user.task_status.keys()] for user in users}
 		
 		mdl.add_courses(courses)
 		mdl.add_tasks(tasks)
@@ -18,6 +20,9 @@ def populate(adapter: MoodleAdapterClosed, config: Config) -> None:
 		submissions2add: list[tuple[User, Task]] = []
 		completions2add: list[tuple[User, Task]] = []
 		for user in users:
+			courses = courses_byusername[user.name]
+			mdl.add_user_enrols(user, courses)
+			
 			for name, status in user.task_status.items():
 				task = tasks_bytaskname[name]
 				if status in (TaskStatus.SUBMITTED, TaskStatus.COMPLETED):

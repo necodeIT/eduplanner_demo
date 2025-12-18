@@ -153,6 +153,21 @@ foreach ($courses as $course) {{
 		for course, courseID in zip(courses, courseIDs):
 			course.moodleid = int(courseID)
 
+	def add_user_enrols(self, user: mUser, courses: Collection[mCourse]) -> None:
+		data = ",".join([f"{course.moodleid}" for course in courses])
+		
+		self.__run_code(f"""
+$courses = [{data}];
+$userid = {user.moodleid};
+
+$enrolplugin = enrol_get_plugin('manual');
+
+foreach ($courses as $courseid) {{
+	$instance = $DB->get_record('enrol', ['courseid' => $courseid, 'enrol' => 'manual']);
+	$enrolplugin->enrol_user($instance, $userid);
+}}
+""")
+
 	def add_tasks(self, tasks: Collection[tuple[mCourse, mTask]]) -> None:
 		assigns = ",".join([
 			f"""[
