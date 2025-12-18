@@ -175,7 +175,6 @@ foreach ($courses as $course) {{
 """, True, ['course/lib'])
 		assert stdout is not None
 		courseIDs = stdout[:-1].split('\0')[:]
-		print(courseIDs)
 		assert len(courseIDs) == len(courses)
 		for course, courseID in zip(courses, courseIDs):
 			course.moodleid = int(courseID)
@@ -279,7 +278,6 @@ foreach ($assigns as [$userid, $assignid]) {{
 		:param bool|str communicate: whether to communicate with the script - will be passed to stdin if string
 		:return str|None: stdout if communicate was true, None otherwise
 		"""
-		print("imports:", imports)
 		out: str | None
 		with self.__popen_code(code, imports) as p:
 			if communicate:
@@ -311,7 +309,7 @@ error_reporting(E_ALL);
 			fn = f"{i}.php"
 			bootstrap += f"require_once('{pathjoin(self.moodledir, fn)}');"
 		
-		print(toexecute := f"{bootstrap}{code}")
+		toexecute = f"{bootstrap}{code}"
 		
 		return Popen(
 			["php", '-r', toexecute, '--'],
