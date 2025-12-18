@@ -195,7 +195,6 @@ foreach ($assigns as $assign) {{
 		= $data->requiresubmissionstatement
 		= $data->sendnotifications
 		= $data->sendlatenotifications
-		= $data->grade
 		= $data->allowsubmissionsfromdate
 		= $data->teamsubmission
 		= $data->requireallteammemberssubmit
@@ -203,6 +202,7 @@ foreach ($assigns as $assign) {{
 		= $data->markingworkflow
 		= $data->markingallocation
 		= false;
+	$data->grade = 100;
 	// setting module and returning assignid
 	echo add_moduleinfo($data, $course)->instance . "\\0";
 }}
