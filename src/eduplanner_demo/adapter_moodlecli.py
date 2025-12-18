@@ -239,10 +239,10 @@ foreach ($assigns as [$userid, $assignid]) {{
 	$context = context_module::instance($cm->id);
 	$assignment = new assign($context, $cm, null);
 	$grade = $assignment->get_user_grade($userid, true, 1);
-	$grade->grade = '100';
+	$grade->grade = 100;
 	$assignment->update_grade($grade);
 }}
-""")
+""", imports=["mod/assign/locallib"])
 
 	def __run_code(self, code: str, communicate: bool | str = False, imports: Iterable[str] = []) -> str | None:
 		""" Popens code and stuff
