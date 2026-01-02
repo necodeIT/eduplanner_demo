@@ -5,6 +5,12 @@
         ],
         "schema/courses.yml.schema.json": [
             "config/courses.yml"
+        ],
+        "schema/slots.yml.schema.json": [
+            "config/slots.yml"
+        ],
+        "schema/plans.yml.schema.json": [
+            "config/plans.yml"
         ]
     },
     "emeraldwalk.runonsave": {

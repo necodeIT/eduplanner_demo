@@ -112,7 +112,7 @@ foreach ($allcourseids as $courseid) {{
 }}
 """)
 
-	def add_users(self, users: Iterable[mUser]) -> None:
+	def add_users(self, users: Iterable[mUser], token: str) -> None:
 		caplists = {user.name: ",".join([f"'local/lb_planner:{cap}'" for cap in user.capabilities]) for user in users}
 		clazzs = {user.name: f"'{e(user.clazz)}'" if user.clazz is not None else 'null' for user in users}
 		firstnames = {}
@@ -131,7 +131,7 @@ foreach ($allcourseids as $courseid) {{
 		
 		data = ",".join([
 			f"'{e(user.name.replace(' ', '_'))}'=>"
-			f"['{user.token}',[{caplists[user.name]}],{clazzs[user.name]},'{e(firstnames[user.name])}','{e(lastnames[user.name])}']"
+			f"['{token}',[{caplists[user.name]}],{clazzs[user.name]},'{e(firstnames[user.name])}','{e(lastnames[user.name])}']"
 			for user in users
 		])
 		stdout = self.__run_code(f"""
@@ -278,15 +278,25 @@ foreach ($assigns as [$userid, $assignid]) {{
 		:param bool|str communicate: whether to communicate with the script - will be passed to stdin if string
 		:return str|None: stdout if communicate was true, None otherwise
 		"""
-		out: str | None
+		out: bytes | None = None
+		err: bytes | None = None
 		with self.__popen_code(code, imports) as p:
 			if communicate:
-				out = p.communicate(communicate if isinstance(communicate, str) else None)[0].decode('utf-8')
-			else:
-				out = None
-			assert p.wait() == 0 # TODO: proper error handling
+				out, err = p.communicate(communicate if isinstance(communicate, str) else None)
+			
+			if p.wait() != 0:
+				if not communicate:
+					assert p.stderr is not None
+					err = p.stderr.read()
+				
+				assert err is not None
+
+				print(f"Encountered error in php code:")
+				print(f"\033[31m{err.decode('utf-8')}\033[0m")
+				print(f"\033[2m{code}\033[0m")
+				exit(1)
 		
-		return out
+		return None if out is None else out.decode('utf-8')
 
 	def __popen_code(self, code: str, imports: Iterable[str] = []) -> Popen:
 		""" Popens custom php code with moodle context
@@ -313,7 +323,7 @@ error_reporting(E_ALL);
 		
 		return Popen(
 			["php", '-r', toexecute, '--'],
-			stdout=PIPE
+			stdout=PIPE, stderr=PIPE
 		)
 
 	def __run_script(self, name: SCRIPTNAME, params: Iterable[str], communicate: bool | str = False) -> str | None:
@@ -324,16 +334,27 @@ error_reporting(E_ALL);
 		:param bool|str communicate: whether to communicate with the script - will be passed to stdin if string
 		:return str|None: stdout if communicate was true, None otherwise
 		"""
-		out: str | None
+  
+		out: bytes | None = None
+		err: bytes | None = None
 		with self.__popen_script(name, params) as p:
 			if communicate:
-				out = p.communicate(communicate if isinstance(communicate, str) else None)[0].decode('utf-8')
-			else:
-				out = None
-			assert p.wait() == 0 # TODO: proper error handling
+				out, err = p.communicate(communicate if isinstance(communicate, str) else None)
+			
+			if p.wait() != 0:
+				if not communicate:
+					assert p.stderr is not None
+					err = p.stderr.read()
+				
+				assert err is not None
+
+				print(f"Encountered error in script {name}:")
+				print(f"\033[31m{err.decode('utf-8')}\033[0m")
+				print(f"Script Parameters: {params}")
+				exit(1)
 		
-		return out
-	
+		return None if out is None else out.decode('utf-8')
+
 	def __popen_script(self, name: SCRIPTNAME, params: Iterable[str]) -> Popen:
 		""" Popens script and passes parameters to it
 
@@ -343,7 +364,7 @@ error_reporting(E_ALL);
 		"""
 		return Popen(
 			["php", '-f', pathjoin(self.script_folder, f"{name}.php"), '--', *params],
-			stdout=PIPE
+			stdout=PIPE, stderr=PIPE
 		)
 	
 	@cached_property

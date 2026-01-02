@@ -1,19 +1,19 @@
+password: "1234"
 users:
   - name: Alice Johnson
     capabilities:
       - student
     class: "1A"
-    token: token-alice-1a
     task-status:
       mathematics.algebra_foundations: completed
       mathematics.integrals: submitted
       physics.mechanics: completed
       physics.electricity_and_magnetism: submitted
+
   - name: Brian Patel
     capabilities:
       - student
     class: "1B"
-    token: token-brian-1b
     task-status:
       mathematics.derivatives: submitted
       literature.poetry_analysis: completed
@@ -23,7 +23,6 @@ users:
     capabilities:
       - student
     class: "2A"
-    token: token-carla-2a
     task-status:
       mathematics.midterm_exam: submitted
       mathematics.final_exam: submitted
@@ -34,7 +33,6 @@ users:
     capabilities:
       - student
     class: "2B"
-    token: token-diego-2b
     task-status:
       mathematics.integrals: completed
       mathematics.derivatives: completed

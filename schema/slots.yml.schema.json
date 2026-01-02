@@ -1,0 +1,108 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "EduPlanner Demo Slots Config",
+    "type": "object",
+    "required": [
+        "slots"
+    ],
+    "properties": {
+        "slots": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "weekday",
+                    "start",
+                    "duration",
+                    "supervisors",
+                    "room",
+                    "capacity",
+                    "mappings",
+                    "disambiguate"
+                ],
+                "properties": {
+                    "disambiguate": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "weekday": {
+                        "enum": [
+                            "monday",
+                            "tuesday",
+                            "wednesday",
+                            "thursday",
+                            "friday",
+                            "saturday",
+                            "sunday"
+                        ]
+                    },
+                    "start_hour": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 16
+                    },
+                    "duration": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 16
+                    },
+                    "supervisors": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "prof._elaine_brooks",
+                                "scheduler_admin"
+                            ]
+                        }
+                    },
+                    "room": {
+                        "type": "string",
+                        "maxLength": 7
+                    },
+                    "capacity": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "mappings": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "class",
+                                "course"
+                            ],
+                            "properties": {
+                                "class": {
+                                    "type": "string",
+                                    "enum": [
+                                        "1A",
+                                        "1B",
+                                        "2A",
+                                        "2B",
+                                        "3A",
+                                        "3B",
+                                        "4A",
+                                        "4B",
+                                        "5A",
+                                        "5B"
+                                    ]
+                                },
+                                "course": {
+                                    "type": "string",
+                                    "enum": [
+                                        "mathematics",
+                                        "physics",
+                                        "literature",
+                                        "computer_science"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "additionalProperties": false
+        }
+    }
+}
