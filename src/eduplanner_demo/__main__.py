@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from .logger import Logger
 from . import __version__
 from .config import Config, print_config
 from .schemagen import schemagen
@@ -17,9 +18,11 @@ class Commands(StrEnum):
 
 if __name__ == '__main__':
 	ap = ArgumentParser("eduplanner_demo", add_help=True)
+ 
 	# general parameters
 	ap.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 	ap.add_argument("-c", "--config", type=Path, help="directory to read configs from")
+	ap.add_argument("-v", "--verbose", action="store_true", help="enable verbose output")
 	# subcommands
 	sp = ap.add_subparsers(
 		metavar="<command>",
@@ -44,6 +47,7 @@ if __name__ == '__main__':
 	# read arguments
 	args = ap.parse_args()
 	config = Config(args.config)
+	Logger.init(args.verbose)
 	
 	# execute subcommands
 	match args.command:

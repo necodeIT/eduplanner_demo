@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from abc import ABC
 from datetime import datetime, timedelta, UTC, timezone
 
+from .logger import Logger
+
 NOW = datetime.now(UTC)
 
 def toId(name: str) -> str:
@@ -237,7 +239,8 @@ def find_user(users: list[User], usrid: str) -> User:
     for user in users:
         if user.id == usrid:
             return user
-    raise ValueError(f"user with id '{usrid}' not found")
+    Logger.error(f"user with id '{usrid}' not found")
+    exit(1)
 
 def find_task(tasks: list[Task], id: str) -> Task:
     """Finds a task by ID in a list of tasks.
@@ -249,7 +252,8 @@ def find_task(tasks: list[Task], id: str) -> Task:
     for task in tasks:
         if task.id == id:
             return task
-    raise ValueError(f"task with id '{id}' not found")
+    Logger.error(f"task with id '{id}' not found")
+    exit(1)
 
 def find_course(courses: list[Course], crid: str) -> Course:
     """Finds a course by ID in a list of courses.
@@ -261,4 +265,5 @@ def find_course(courses: list[Course], crid: str) -> Course:
     for course in courses:
         if course.id == crid:
             return course
-    raise ValueError(f"course with id '{crid}' not found")
+    Logger.error(f"course with id '{crid}' not found")
+    exit(1)

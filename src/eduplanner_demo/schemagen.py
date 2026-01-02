@@ -1,3 +1,4 @@
+from .logger import Logger
 from .model import Capability, Clazz, Course, TaskStatus, User, Weekday
 from .config import Config
 from os.path import join as pathjoin
@@ -13,6 +14,11 @@ def schemagen(dp: str, courses: list[Course], users: list[User]) -> None:
     :param list[Course] courses: existing courses to take into account
     :param str dp: directory path to save schema files to
     """
+    
+    Logger.info(f"generating schema files to {dp}...")
+
+
+    Logger.debug("Generating user schema...")
 
     status_props = {
         task.id: {
@@ -129,6 +135,18 @@ def schemagen(dp: str, courses: list[Course], users: list[User]) -> None:
         "additionalProperties": False,
     }
 
+    fn = "users.yml.schema.json"
+    fp = pathjoin(dp, fn)
+
+    with open(fp, "w") as f:
+        import json
+
+        json.dump(USER_SCHEMA, f, indent=4)
+        
+    Logger.success(fn)
+
+    Logger.debug("Generating slots schema...")
+
     SLOTS_SCHEMA = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "EduPlanner Demo Slots Config",
@@ -198,6 +216,17 @@ def schemagen(dp: str, courses: list[Course], users: list[User]) -> None:
             }
         },
     }
+    
+    fn = "slots.yml.schema.json"
+    fp = pathjoin(dp, fn)
+    with open(fp, "w") as f:
+        import json
+
+        json.dump(SLOTS_SCHEMA, f, indent=4)
+
+    Logger.success(fn)
+
+    Logger.debug("Generating plans schema...")
 
     PLANS_SCHEMA = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -266,26 +295,8 @@ def schemagen(dp: str, courses: list[Course], users: list[User]) -> None:
         },
     }
 
-    print(f"generating schema files to \033[34m{dp}\033[0m")
 
-    fn = "users.yml.schema.json"
-    fp = pathjoin(dp, fn)
 
-    with open(fp, "w") as f:
-        import json
-
-        json.dump(USER_SCHEMA, f, indent=4)
-
-    print(f"\t\033[32mdone\033[0m: {fn}")
-
-    fn = "slots.yml.schema.json"
-    fp = pathjoin(dp, fn)
-    with open(fp, "w") as f:
-        import json
-
-        json.dump(SLOTS_SCHEMA, f, indent=4)
-
-    print(f"\t\033[32mdone\033[0m: {fn}")
 
     fn = "plans.yml.schema.json"
     fp = pathjoin(dp, fn)
@@ -294,4 +305,8 @@ def schemagen(dp: str, courses: list[Course], users: list[User]) -> None:
 
         json.dump(PLANS_SCHEMA, f, indent=4)
 
-    print(f"\t\033[32mdone\033[0m: {fn}")
+    Logger.success(fn)
+  
+
+  
+    

@@ -1,6 +1,7 @@
 from os.path import exists, isdir, expanduser, realpath, join as pathjoin
 import yaml
 import eduplanner_demo
+from eduplanner_demo.logger import Logger
 from eduplanner_demo.model import Plan, Deadline, Slot, SlotMapping, Task, Course, User, Capability, Clazz, TaskStatus, Weekday, find_course, toId, find_user, find_task
 
 
@@ -15,9 +16,11 @@ class Config:
         else:
             configdir = realpath(configdir)
             if not exists(configdir):
-                raise IOError(f"{configdir} does not exist")
+                Logger.error(f"{configdir} does not exist")
+                exit(1)
             elif not isdir(configdir):
-                raise IOError(f"{configdir} is not a directory")
+                Logger.error(f"{configdir} is not a directory")
+                exit(1)
 
         self.__configdir = configdir
         
@@ -27,19 +30,18 @@ class Config:
         """Tries to return a config file matching the requested name
 
         :param str name: name of the config file to get (without path nor file extension)
-        :raises: :class:`FileNotFoundError`: could not find config file
         :return str: the config file path
         """
         fp = pathjoin(self.__configdir, f"{name}.yml")
         if not exists(fp):
-            raise FileNotFoundError(f"could not find config file \"{fp}\"")
+            Logger.error(f"could not find config file \"{fp}\"")
+            exit(1)
         return fp
 
     @classmethod
     def find_configdir(cls) -> str:
         """Tries to find a directory to read configs from.
 
-        :raises: :class:`IOError`: no config found
         :return str: the found directory
         """
         # TODO: cross-platform solution
@@ -52,7 +54,8 @@ class Config:
             if exists(folder):
                 return folder
 
-        raise OSError('no config folder found')
+        Logger.error('no config folder found')
+        exit(1)
 
     def read_users_config(self, tasks: list[Task]) -> tuple[list[User], str]:
         """Reads the users configuration from the YAML file and creates User objects.
@@ -66,6 +69,7 @@ class Config:
             config = yaml.safe_load(f)
 
         if config is None:
+            Logger.warning("Empty user config file")
             return ([], "")
         users = []
         for user_data in config.get("users", []):
@@ -117,18 +121,21 @@ class Config:
             for supervisor_id in slot_data.get("supervisors", []):
                 supervisor = find_user(users, supervisor_id)
                 if Capability.TEACHER not in supervisor.capabilities:
-                    raise ValueError(f"supervisor '{supervisor_id}' does not have TEACHER capability")
+                    Logger.error(f"supervisor '{supervisor_id}' does not have TEACHER capability")
+                    exit(1)
                 supervisors.append(supervisor)
                 
             startunit = slot_data.get("startunit", 1)
             duration = slot_data.get("duration", 1)
             if startunit + duration > 16:
-                raise ValueError(f"slot starting at unit {startunit} with duration {duration} exceeds maximum unit 16")
+                 Logger.error(f"slot starting at unit {startunit} with duration {duration} exceeds maximum unit 16")
+                 exit(1)
             
             room = slot_data.get("room", "")
             capacity = slot_data.get("capacity", 0)
             if len(room) > 7:
-                raise ValueError(f"room '{room}' exceeds maximum length of 7 characters")
+                Logger.error(f"room '{room}' exceeds maximum length of 7 characters")
+                exit(1)
                 
             slot = Slot(
                 supervisors=supervisors,
@@ -158,6 +165,7 @@ class Config:
             config = yaml.safe_load(f)
             
         if config is None:
+            Logger.warning("Empty course config file")
             return []
         courses = []
         for course_data in config["courses"]:
@@ -187,6 +195,7 @@ class Config:
             config = yaml.safe_load(f)
             
         if config is None:
+            Logger.warning("Empty plan config file")
             return []
         
         plans = []

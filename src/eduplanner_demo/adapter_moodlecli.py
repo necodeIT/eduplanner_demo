@@ -11,6 +11,7 @@ from typing import Any
 from datetime import datetime, UTC, timedelta
 from unittest import result
 
+from .logger import Logger
 from .moodleadapter import MoodleAdapter, MoodleAdapterOpen
 from .model import Plan, Slot, User as mUser, Task as mTask, Course as mCourse
 
@@ -70,8 +71,7 @@ def php_dump(code: str) -> None:
 	""" dumps php code output for debugging purposes """
 	
 	## print with line numbers in different color
-	for i, line in enumerate(code.split('\n')):
-		print(f"\033[90m{str(i + 1).rjust(1)}\033[0m\033[90m | \033[0m\033[37m{line}\033[0m")
+
 
 class MoodleCLI(MoodleAdapter):
 	""" Connects to a moodle instance via the CLI scripts """
@@ -204,6 +204,7 @@ foreach ($courses as $course) {{
 		courseIDs = stdout[:-1].split('\0')[:]
 		assert len(courseIDs) == len(courses)
 		for course, courseID in zip(courses, courseIDs):
+			Logger.success(f"Created course '{course.name}' with ID {courseID}")
 			course.moodleid = int(courseID)
 
 	def add_user_enrols(self, user: mUser, courses: Collection[mCourse]) -> None:
@@ -266,6 +267,7 @@ foreach ($assigns as $assign) {{
 		assert len(taskIDs) == len(tasks)
 		for (course, task), taskID in zip(tasks, taskIDs):
 			task.moodleid = int(taskID)
+			Logger.debug(f"Created task '{task.name}' in course '{course.name}' with ID {taskID}")
 
 	def add_submissions(self, tasks: Iterable[tuple[mUser, mTask]]) -> None:
 		data = ",".join([
@@ -300,11 +302,15 @@ foreach ($assigns as [$userid, $assignid]) {{
   
 	def add_plans(self, plans: Collection[Plan]) -> None:
 		for plan in plans:
+			Logger.debug(f"Creating plan '{plan.name}' owned by user ID {plan.owner.moodleid} with members {[m.moodleid for m in plan.members]}")
 			self.__create_plan(plan)
+			Logger.debug(f"Created plan '{plan.name}' for owner ID {plan.owner.moodleid}")
 
 	def add_slots(self, slots: Collection[Slot]) -> None:
 		for slot in slots:
+			Logger.debug(f"Creating slot starting at unit {slot.startunit} on weekday {slot.weekday} in room '{slot.room}' with capacity {slot.capacity}")
 			self.__create_slot(slot)
+			Logger.debug(f"Created slot ID {slot.moodleid} starting at unit {slot.startunit} on weekday {slot.weekday}")
 	
 
 	def __create_slot(self, slot: Slot) -> None:
@@ -320,6 +326,7 @@ foreach ($assigns as [$userid, $assignid]) {{
 		slot.moodleid = result['id']
 		
 		# add mappings
+		Logger.debug("Adding slot mappings...")
 		for mapping in slot.mappings:
 			result = self.__run_webservice_function("slots_add_slot_filter", {
 				"slotid": slot.moodleid,
@@ -327,14 +334,17 @@ foreach ($assigns as [$userid, $assignid]) {{
 				"vintage": mapping.clazz.value,
 			})
 			mapping.moodleid = result['id']
+			Logger.debug(f"Added mapping {mapping.moodleid} to slot {slot.moodleid}")
 
 		
 		# add supervisors
+		Logger.debug("Adding slot supervisors...")
 		for supervisor in slot.supervisors:
 			self.__run_webservice_function("slots_add_slot_supervisor", {
 				"slotid": slot.moodleid,
 				"userid": supervisor.moodleid,
 			})
+			Logger.debug(f"Added supervisor {supervisor.moodleid} to slot {slot.moodleid}")
   
 	def __create_plan(self, plan: Plan) -> None:
 		""" creates a plan in moodle """
@@ -342,34 +352,47 @@ foreach ($assigns as [$userid, $assignid]) {{
 		invites = {}
 	
 		# send invites as plan owner to members
+		Logger.debug("Inviting plan members...")
 		for member in plan.members:
+			
 			result =  self.__run_webservice_function("plan_invite_user", {
 				"inviteeid": member.moodleid
 			}, as_user=plan.owner.moodleid)
 			invites[member.moodleid] = result['id']
+			Logger.debug(f"Invited member {member.moodleid} with invite ID {result['id']}")
 		
 		# accept invites as members
+		Logger.debug("Accepting plan invites...")
 		for user_id, invite_id in invites.items():
 			self.__run_webservice_function("plan_accept_invite", {
 				"inviteid": invite_id
 			}, as_user=user_id)
+			Logger.debug(f"User {user_id} accepted invite ID {invite_id}")
       
 		# set member access to write
+		Logger.debug("Setting plan member access...")
 		for member in plan.members:
 			self.__run_webservice_function("plan_update_access", {
 				"accesstype": 1,
 				"memberid": member.moodleid
 			}, as_user=plan.owner.moodleid)
-  
+			Logger.debug(f"Set member {member.moodleid} access to write")
+	
+	
 		# rename plan to plan.name
+		Logger.debug("Renaming plan...")
 		self.__run_webservice_function("plan_update_plan", {
       		"planname": plan.name,
       	}, as_user=plan.owner.moodleid)
+		Logger.debug(f"Renamed plan to '{plan.name}'")
 		
   
 		now = datetime.now(UTC)
+
+
   
 		# add deadlines to owner's plan
+		Logger.debug("Adding plan deadlines...")
 		for deadline in plan.deadlines:
 			# UTC+0 unix timestamp from start/end
 			start = now + timedelta(days=deadline.deadlinestart)
@@ -379,6 +402,7 @@ foreach ($assigns as [$userid, $assignid]) {{
 				"deadlinestart": int(start.timestamp()),
 				"deadlineend": int(end.timestamp()),
 			}, as_user=plan.owner.moodleid)
+			Logger.debug(f"Added deadline for task {deadline.task.moodleid} from {start.isoformat()} to {end.isoformat()}")
 
 
 	def __run_code(self, code: str, communicate: bool | str = False, imports: Iterable[str] = []) -> str | None:
@@ -402,9 +426,9 @@ foreach ($assigns as [$userid, $assignid]) {{
 				
 				assert err is not None
 
-				print(f"Encountered error in php code:")
-				print(f"\033[31m{err.decode('utf-8')}\033[0m")
-				php_dump(finalcode)
+				Logger.error("Encountered error in injected code")
+				Logger.debug(err.decode('utf-8'))
+				Logger.code(finalcode)
 				exit(1)
 		
 		return None if out is None else out.decode('utf-8')
@@ -459,9 +483,9 @@ error_reporting(E_ALL);
 				
 				assert err is not None
 
-				print(f"Encountered error in script {name}:")
-				print(f"\033[31m{err.decode('utf-8')}\033[0m")
-				print(f"Script Parameters: {params}")
+				Logger.error(f"Encountered error in script {name}:")
+				Logger.debug(f"{err.decode('utf-8')}")
+				Logger.debug(f"Script Parameters: {params}")
 				exit(1)
 		
 		return None if out is None else out.decode('utf-8')
@@ -487,6 +511,7 @@ error_reporting(E_ALL);
 		:param int as_user: the id of the user to run this as (1 means guest, 2 means admin, everything else is normal users)
 		:return Popen: the running process
 		"""
+		Logger.debug(f"Calling webservice function {namespace}_{function} as user ID {as_user} with parameters {parameters}")
 		# NOTE: this is mostly taken from external_api::call_external_function(…);
 		json_data = self.__run_code(f"""\
 			$USER = core_user::get_user({as_user}, '*', MUST_EXIST);
@@ -513,9 +538,21 @@ error_reporting(E_ALL);
 		)
   
 		if json_data is None or len(json_data.strip()) == 0:
+			Logger.debug("Webservice function returned no data")
 			return None
 
-		return json.loads(json_data)
+		json_result = json.loads(json_data)
+  
+		if json_result is None:
+			Logger.debug("Webservice function returned null")
+			return None
+  
+		if 'error' in json_result:
+			Logger.error(f"Webservice function {namespace}_{function} returned error: {json_result['error']['message']}")
+			Logger.debug(json_data)
+			exit(1)
+  
+		return json_result
 
 
 	
