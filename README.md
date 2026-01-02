@@ -44,8 +44,13 @@ TODO: automate these processes
 Before you can run the demo script, you need to
 
 - install the [eduplanner plugin](https://github.com/necodeIT/lb_planner_plugin/)
+- Enable web services in moodle
+  - Site administration -> Advanced features -> Enable web services
 - create roles for the included capabilities (student, teacher, slotmaster)
   The names of these roles are not important - as long as there's one for each capability, the script will find the correct roles to use.
+  NOTE: The following capabilities need to be assigned to each role:
+  - moodle/webservice:createmobiletoken
+  - moodle/webservice:createtoken
 - if you want to debug errors, you should also enable error reporting in moodle, otherwise the script will not be able to report any details about errors
 
 after this, the script should be able to handle everything itself.
