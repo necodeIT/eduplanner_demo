@@ -7,7 +7,7 @@ def populate(adapter: MoodleAdapterClosed, config: Config) -> None:
 	with adapter.connect() as mdl:
 		mdl.clear()
 
-		users, courses = config.read_moodle_config()
+		passwd, users, courses, slots, plans = config.read_moodle_config()
 		tasks = [(course, task) for course in courses for task in course.tasks]
 		course_bytaskname = {task.id: course for course, task in tasks}
 		tasks_bytaskname = {task[1].id: task[1] for task in tasks}
@@ -15,7 +15,9 @@ def populate(adapter: MoodleAdapterClosed, config: Config) -> None:
 		
 		mdl.add_courses(courses)
 		mdl.add_tasks(tasks)
-		mdl.add_users(users)
+		mdl.add_users(users, passwd)
+		# TODO: slots
+		# TODO: plans
 		
 		submissions2add: list[tuple[User, Task]] = []
 		completions2add: list[tuple[User, Task]] = []

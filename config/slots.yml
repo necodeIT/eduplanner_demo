@@ -1,0 +1,13 @@
+slots:
+  - room: "H1123"
+    disambiguate: 0
+    capacity: 30
+    mappings:
+      - course: literature
+        class: "2A"
+    start: 15
+    weekday: monday
+    duration: 2
+    supervisors:
+      - prof._elaine_brooks
+      - scheduler_admin

@@ -48,7 +48,8 @@ if __name__ == '__main__':
 	# execute subcommands
 	match args.command:
 		case Commands.SCHEMAGEN:
-			schemagen(config.read_courses_config(), realpath(args.out))
+			password, users, courses, slots, plans = config.read_moodle_config()
+			schemagen(realpath(args.out), courses, users)
 		case Commands.SHOWCONFIG:
 			print_config(config)
 		case Commands.POPULATE:

@@ -1,0 +1,93 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "EduPlanner Demo Plans Config",
+    "type": "object",
+    "required": [
+        "plans"
+    ],
+    "properties": {
+        "plans": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "deadlines",
+                    "owner"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "owner": {
+                        "description": "The owner of the plan.",
+                        "type": "string",
+                        "enum": [
+                            "alice_johnson",
+                            "brian_patel",
+                            "carla_nguyen",
+                            "diego_ruiz"
+                        ]
+                    },
+                    "members": {
+                        "type": "array",
+                        "description": "Users the plan is shared with (write access)",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "alice_johnson",
+                                "brian_patel",
+                                "carla_nguyen",
+                                "diego_ruiz"
+                            ]
+                        }
+                    },
+                    "deadlines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "task",
+                                "deadlinestart"
+                            ],
+                            "properties": {
+                                "task": {
+                                    "type": "string",
+                                    "enum": [
+                                        "mathematics.algebra_foundations",
+                                        "mathematics.integrals",
+                                        "mathematics.derivatives",
+                                        "mathematics.midterm_exam",
+                                        "mathematics.final_exam",
+                                        "physics.mechanics",
+                                        "physics.electricity_and_magnetism",
+                                        "physics.waves_and_optics",
+                                        "physics.final_exam",
+                                        "literature.poetry_analysis",
+                                        "literature.modern_novel_essay",
+                                        "literature.research_presentation",
+                                        "literature.final_exam",
+                                        "computer_science.intro_to_programming",
+                                        "computer_science.data_structures",
+                                        "computer_science.algorithms_quiz",
+                                        "computer_science.capstone_project"
+                                    ]
+                                },
+                                "deadlinestart": {
+                                    "type": "integer",
+                                    "description": "Days after now when the deadline starts.",
+                                    "minimum": 0
+                                },
+                                "duration": {
+                                    "type": "integer",
+                                    "description": "Days after deadline start when the deadline ends.",
+                                    "minimum": 0
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

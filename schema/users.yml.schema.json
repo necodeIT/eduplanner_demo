@@ -3,9 +3,14 @@
     "title": "EduPlanner Demo Users Config",
     "type": "object",
     "required": [
-        "users"
+        "users",
+        "password"
     ],
     "properties": {
+        "password": {
+            "type": "string",
+            "description": "Default password for created users."
+        },
         "users": {
             "description": "Moodle Users to create.",
             "type": "array",
@@ -16,7 +21,6 @@
                         "required": [
                             "name",
                             "capabilities",
-                            "token",
                             "class",
                             "task-status"
                         ],
@@ -215,9 +219,6 @@
                                         "slotmaster"
                                     ]
                                 }
-                            },
-                            "token": {
-                                "type": "string"
                             }
                         },
                         "additionalProperties": false

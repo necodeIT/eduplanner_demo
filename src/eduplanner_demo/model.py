@@ -136,9 +136,120 @@ class User(MoodleObject):
     """List of capabilities the user possesses."""
     clazz: Clazz | None
     """The class the user is enrolled in."""
-    token: str
-    """Authentication token for the user."""
     task_status: dict[str, TaskStatus]
     """Task completion status mapping."""
 
-    # TODO: plan
+    @property
+    def id(self) -> str:
+        """A unique identifier generated from the user's name."""
+        return toId(self.name)
+
+@dataclass
+class SlotMapping(MoodleObject):
+    """
+    Represents a mapping between a slot and a user or group.
+    """
+    course: Course
+    """The name of the course this slot is mapped to."""
+    clazz: Clazz
+    """The class this slot is mapped to."""
+
+@dataclass
+class Slot(MoodleObject):
+    """
+    Represents an eduplanner slot
+    """
+    disambiguate: int
+    """An integer to disambiguate slots with the same time and place."""
+    startunit: int
+    """The starting unit of the slot (1-16)."""
+    duration: int
+    """The duration of the slot (may not exceed 16 when added to startunit)."""
+    weekday: str
+    """The weekday of the slot (e.g., 'monday', 'tuesday')."""
+    room: str
+    """The room where the slot takes place."""
+    capacity: int
+    """How many students can fit into this slot."""
+    mappings: list[SlotMapping]
+    """The list of class/course mappings for this slot."""
+    supervisors: list[User]
+    """IDs of the users that are supervisors for this slot."""
+
+    @property
+    def id(self) -> str:
+        """A unique identifier generated from place and time."""
+        return toId(f"{self.room}.{self.disambiguate}")
+
+@dataclass
+class Deadline(MoodleObject):
+    """
+    Represents an eduplanner deadline
+    """
+    task: Task
+    """The task this deadline is associated with."""
+    deadlinestart: int
+    """The start of the deadline in "days after now"."""
+    duration: int
+    """The end of the deadline in "days after now"."""
+    
+    
+
+@dataclass
+class Plan(MoodleObject):
+    """
+    Represents an eduplanner plan
+    """
+    name: str
+    """The name of the plan."""
+    deadlines: list[Deadline]
+    """Deadlines as slotid: (deadlinestart, deadlineend), where start and end are in "days after now"."""
+    owner: User
+    """The owner of the plan."""
+    members: list[User]
+    """The members of the plan."""
+    def __post_init__(self):
+        # make sure no task has two mappings
+        usedtasks = []
+        for deadline in self.deadlines:
+            assert deadline.task not in usedtasks
+            usedtasks.append(deadline.task)
+
+
+
+
+def find_user(users: list[User], usrid: str) -> User:
+    """Finds a user by id in a list of users.
+
+    :param list[User] users: The list of users to search.
+    :param str usrid: The id of the user to find.
+    :return User | None: The found User object or None if not found.
+    """
+    for user in users:
+        if user.id == usrid:
+            return user
+    raise ValueError(f"user with id '{usrid}' not found")
+
+def find_task(tasks: list[Task], id: str) -> Task:
+    """Finds a task by ID in a list of tasks.
+
+    :param list[Task] tasks: The list of tasks to search.
+    :param str id: The ID of the task to find.
+    :return Task | None: The found Task object or None if not found.
+    """
+    for task in tasks:
+        if task.id == id:
+            return task
+    raise ValueError(f"task with id '{id}' not found")
+
+def find_course(courses: list[Course], crid: str) -> Course:
+    """Finds a course by ID in a list of courses.
+
+    :param list[Course] courses: The list of courses to search.
+    :param str crid: The ID of the course to find.
+    :return Course: The found Course object.
+    """
+    for course in courses:
+        if course.id == crid:
+            return course
+    raise ValueError(f"course with id '{crid}' not found")
