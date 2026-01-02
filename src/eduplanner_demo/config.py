@@ -1,7 +1,7 @@
 from os.path import exists, isdir, expanduser, realpath, join as pathjoin
 import yaml
 import eduplanner_demo
-from eduplanner_demo.model import Plan, Deadline, Slot, SlotMapping, Task, Course, User, Capability, Clazz, TaskStatus, find_course, toId, find_user, find_task
+from eduplanner_demo.model import Plan, Deadline, Slot, SlotMapping, Task, Course, User, Capability, Clazz, TaskStatus, Weekday, find_course, toId, find_user, find_task
 
 
 
@@ -135,7 +135,7 @@ class Config:
                 disambiguate=slot_data["disambiguate"],
                 startunit=startunit,
                 duration=duration,
-                weekday=slot_data["weekday"],
+                weekday=Weekday[slot_data["weekday"].upper()],
                 room=room,
                 capacity=capacity,
                 mappings=mappings,
@@ -229,10 +229,6 @@ class Config:
             plans,
         )
 
-
-
-
-
 def print_config(config: Config):
     password, users, courses, slots, plans = config.read_moodle_config()
     print(f"Users \033[2m(password: {password})\033[0m:")
@@ -269,7 +265,7 @@ def print_config(config: Config):
             f"""\
 |\t|\tStartunit: {slot.startunit}
 |\t|\tDuration: {slot.duration}
-|\t|\tWeekday: {slot.weekday}
+|\t|\tWeekday: {slot.weekday.name.lower()}
 |\t|\tRoom: {slot.room}
 |\t|\tCapacity: {slot.capacity}
 |\t|\tMappings:"""

@@ -16,8 +16,6 @@ def populate(adapter: MoodleAdapterClosed, config: Config) -> None:
 		mdl.add_courses(courses)
 		mdl.add_tasks(tasks)
 		mdl.add_users(users, passwd)
-		# TODO: slots
-		# TODO: plans
 		
 		submissions2add: list[tuple[User, Task]] = []
 		completions2add: list[tuple[User, Task]] = []
@@ -34,3 +32,5 @@ def populate(adapter: MoodleAdapterClosed, config: Config) -> None:
 			
 		mdl.add_submissions(submissions2add)
 		mdl.add_grades(completions2add)
+		mdl.add_plans(plans)
+		mdl.add_slots(slots)

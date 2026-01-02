@@ -3,7 +3,7 @@ users:
   - name: Alice Johnson
     capabilities:
       - student
-    class: "1A"
+    class: "1AHIT"
     task-status:
       mathematics.algebra_foundations: completed
       mathematics.integrals: submitted
@@ -13,7 +13,7 @@ users:
   - name: Brian Patel
     capabilities:
       - student
-    class: "1B"
+    class: "1BHIT"
     task-status:
       mathematics.derivatives: submitted
       literature.poetry_analysis: completed
@@ -22,7 +22,7 @@ users:
   - name: Carla Nguyen
     capabilities:
       - student
-    class: "2A"
+    class: "2AHIT"
     task-status:
       mathematics.midterm_exam: submitted
       mathematics.final_exam: submitted
@@ -32,7 +32,7 @@ users:
   - name: Diego Ruiz
     capabilities:
       - student
-    class: "2B"
+    class: "2BHIT"
     task-status:
       mathematics.integrals: completed
       mathematics.derivatives: completed
@@ -42,9 +42,9 @@ users:
   - name: Prof. Elaine Brooks
     capabilities:
       - teacher
-    token: token-elaine-teacher
   - name: Scheduler Admin
     capabilities:
       - teacher
+  - name: Slotmaster
+    capabilities:
       - slotmaster
-    token: token-scheduler-ops

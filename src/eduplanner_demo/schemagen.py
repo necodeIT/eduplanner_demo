@@ -1,4 +1,4 @@
-from .model import Capability, Clazz, Course, TaskStatus, User
+from .model import Capability, Clazz, Course, TaskStatus, User, Weekday
 from .config import Config
 from os.path import join as pathjoin
 
@@ -101,7 +101,7 @@ def schemagen(dp: str, courses: list[Course], users: list[User]) -> None:
                         },
                         {
                             "type": "object",
-                            "required": ["name", "capabilities", "token"],
+                            "required": ["name", "capabilities"],
                             "properties": {
                                 "class": {
                                     "type": "string",
@@ -119,7 +119,6 @@ def schemagen(dp: str, courses: list[Course], users: list[User]) -> None:
                                         ],
                                     },
                                 },
-                                "token": {"type": "string"},
                             },
                             "additionalProperties": False,
                         },
@@ -154,13 +153,7 @@ def schemagen(dp: str, courses: list[Course], users: list[User]) -> None:
                         "disambiguate": {"type": "integer", "minimum": 0},
                         "weekday": {
                             "enum": [
-                                "monday",
-                                "tuesday",
-                                "wednesday",
-                                "thursday",
-                                "friday",
-                                "saturday",
-                                "sunday",
+                                w.name.lower() for w in Weekday
                             ]
                         },
                         "start_hour": {"type": "integer", "minimum": 1, "maximum": 16},
