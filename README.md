@@ -45,5 +45,6 @@ Before you can run the demo script, you need to
 
 - install the [eduplanner plugin](https://github.com/necodeIT/lb_planner_plugin/)
 - create roles for the included capabilities (student, teacher, slotmaster)
+- if you want to debug errors, you should also enable error reporting in moodle, otherwise the script will not be able to report any details about errors
 
 after this, the script should be able to handle everything itself.
