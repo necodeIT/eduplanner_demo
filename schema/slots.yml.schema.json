@@ -76,16 +76,16 @@
                                 "class": {
                                     "type": "string",
                                     "enum": [
-                                        "1A",
-                                        "1B",
-                                        "2A",
-                                        "2B",
-                                        "3A",
-                                        "3B",
-                                        "4A",
-                                        "4B",
-                                        "5A",
-                                        "5B"
+                                        "1AHIT",
+                                        "1BHIT",
+                                        "2AHIT",
+                                        "2BHIT",
+                                        "3AHIT",
+                                        "3BHIT",
+                                        "4AHIT",
+                                        "4BHIT",
+                                        "5AHIT",
+                                        "5BHIT"
                                     ]
                                 },
                                 "course": {

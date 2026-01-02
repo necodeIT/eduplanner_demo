@@ -3,12 +3,16 @@ from os.path import realpath, join as pathjoin
 from pwd import getpwuid
 from functools import cached_property
 from subprocess import Popen, PIPE
+import json
 from enum import StrEnum, auto
 from collections.abc import Iterator, Iterable, Collection
 from contextlib import contextmanager
+from typing import Any
+from datetime import datetime, UTC, timedelta
+from unittest import result
 
 from .moodleadapter import MoodleAdapter, MoodleAdapterOpen
-from .model import User as mUser, Task as mTask, Course as mCourse
+from .model import Plan, Slot, User as mUser, Task as mTask, Course as mCourse
 
 #
 # NOTE: All of this essentially works by injecting php code into the moodle codebase (or if you wanna see it that way:
@@ -48,6 +52,26 @@ class DBTable(StrEnum):
 def e(orig: str) -> str:
 	""" escapes strings so they can be used for inserting into php single-quoted strings """
 	return orig.replace('\\', '\\\\').replace('\'', "\\'").strip() # should be good enough
+
+def php_serialize(orig: dict | list | str) -> str:
+	""" serializes a string into php code """
+	if isinstance(orig, dict):
+		return '[' + ', '.join([f"{php_serialize(k)}=>{php_serialize(v)}" for k, v in orig.items()]) + ']'
+	elif isinstance(orig, list):
+		return '[' + ", ".join([php_serialize(v) for v in orig]) + ']'
+	elif isinstance(orig, str):
+		return f"'{e(orig)}'"
+	elif isinstance(orig, int) or isinstance(orig, float):
+		return f"{orig}"
+	else:
+		raise NotImplementedError(f"cannot serialize object of type {type(orig)}")
+
+def php_dump(code: str) -> None:
+	""" dumps php code output for debugging purposes """
+	
+	## print with line numbers in different color
+	for i, line in enumerate(code.split('\n')):
+		print(f"\033[90m{str(i + 1).rjust(1)}\033[0m\033[90m | \033[0m\033[37m{line}\033[0m")
 
 class MoodleCLI(MoodleAdapter):
 	""" Connects to a moodle instance via the CLI scripts """
@@ -157,10 +181,13 @@ foreach ($tocreate as $usrname => [$passwd, $capabilities, $clazz, $firstname, $
 		userIDs = stdout[:-1].split('\0')
 		for user, userID in zip(users, userIDs):
 			user.moodleid = int(userID)
+			# get eduplanner user - this creates it for future use
+			self.__run_webservice_function("user_get_user", {}, as_user=user.moodleid)
+
 
 	def add_courses(self, courses: Collection[mCourse]) -> None:
 		data = ",".join([
-			f"['fullname' => '{e(course.name)}', 'shortname' => '{e(course.name)}', 'category' => $catid, 'idnumber' => '']"
+			f"['fullname' => '{e(course.name)}', 'shortname' => '{e(course.name)}', 'category' => $catid, 'idnumber' => '', 'tags' => ['eduplanner']]"
 			for course in courses
 		])
 		stdout = self.__run_code(f"""
@@ -270,17 +297,101 @@ foreach ($assigns as [$userid, $assignid]) {{
 	$assignment->update_grade($grade);
 }}
 """, imports=["mod/assign/locallib"])
+  
+	def add_plans(self, plans: Collection[Plan]) -> None:
+		for plan in plans:
+			self.__create_plan(plan)
+
+	def add_slots(self, slots: Collection[Slot]) -> None:
+		for slot in slots:
+			self.__create_slot(slot)
+	
+
+	def __create_slot(self, slot: Slot) -> None:
+		""" creates a slot in moodle """
+		# create slot 
+		result = self.__run_webservice_function("slots_create_slot", {
+			"startunit": slot.startunit,
+			"duration": slot.duration,
+			"weekday": slot.weekday,
+			"room": slot.room,
+			"size": slot.capacity,
+		})
+		slot.moodleid = result['id']
+		
+		# add mappings
+		for mapping in slot.mappings:
+			result = self.__run_webservice_function("slots_add_slot_filter", {
+				"slotid": slot.moodleid,
+				"courseid": mapping.course.moodleid,
+				"vintage": mapping.clazz.value,
+			})
+			mapping.moodleid = result['id']
+
+		
+		# add supervisors
+		for supervisor in slot.supervisors:
+			self.__run_webservice_function("slots_add_slot_supervisor", {
+				"slotid": slot.moodleid,
+				"userid": supervisor.moodleid,
+			})
+  
+	def __create_plan(self, plan: Plan) -> None:
+		""" creates a plan in moodle """
+
+		invites = {}
+	
+		# send invites as plan owner to members
+		for member in plan.members:
+			result =  self.__run_webservice_function("plan_invite_user", {
+				"inviteeid": member.moodleid
+			}, as_user=plan.owner.moodleid)
+			invites[member.moodleid] = result['id']
+		
+		# accept invites as members
+		for user_id, invite_id in invites.items():
+			self.__run_webservice_function("plan_accept_invite", {
+				"inviteid": invite_id
+			}, as_user=user_id)
+      
+		# set member access to write
+		for member in plan.members:
+			self.__run_webservice_function("plan_update_access", {
+				"accesstype": 1,
+				"memberid": member.moodleid
+			}, as_user=plan.owner.moodleid)
+  
+		# rename plan to plan.name
+		self.__run_webservice_function("plan_update_plan", {
+      		"planname": plan.name,
+      	}, as_user=plan.owner.moodleid)
+		
+  
+		now = datetime.now(UTC)
+  
+		# add deadlines to owner's plan
+		for deadline in plan.deadlines:
+			# UTC+0 unix timestamp from start/end
+			start = now + timedelta(days=deadline.deadlinestart)
+			end = start + timedelta(days=deadline.duration)
+			self.__run_webservice_function("plan_set_deadline", {
+				"moduleid": deadline.task.moodleid,
+				"deadlinestart": int(start.timestamp()),
+				"deadlineend": int(end.timestamp()),
+			}, as_user=plan.owner.moodleid)
+
 
 	def __run_code(self, code: str, communicate: bool | str = False, imports: Iterable[str] = []) -> str | None:
 		""" Popens code and stuff
 
 		:param str code: the php code to execute
-		:param bool|str communicate: whether to communicate with the script - will be passed to stdin if string
+		:param bool|str: communicate: whether to communicate with the script - will be passed to stdin if string
 		:return str|None: stdout if communicate was true, None otherwise
 		"""
 		out: bytes | None = None
 		err: bytes | None = None
-		with self.__popen_code(code, imports) as p:
+		_p, finalcode = self.__popen_code(code, imports)
+		with _p as p:
 			if communicate:
 				out, err = p.communicate(communicate if isinstance(communicate, str) else None)
 			
@@ -293,16 +404,16 @@ foreach ($assigns as [$userid, $assignid]) {{
 
 				print(f"Encountered error in php code:")
 				print(f"\033[31m{err.decode('utf-8')}\033[0m")
-				print(f"\033[2m{code}\033[0m")
+				php_dump(finalcode)
 				exit(1)
 		
 		return None if out is None else out.decode('utf-8')
 
-	def __popen_code(self, code: str, imports: Iterable[str] = []) -> Popen:
+	def __popen_code(self, code: str, imports: Iterable[str] = []) -> tuple[Popen, str]:
 		""" Popens custom php code with moodle context
 
 		:param str code: the php code to execute
-		:return Popen: the running process
+		:return tuple[Popen, str]: the running process and the bootstrapped code
 		"""
 		
 		imports = ['config', *imports]
@@ -324,7 +435,7 @@ error_reporting(E_ALL);
 		return Popen(
 			["php", '-r', toexecute, '--'],
 			stdout=PIPE, stderr=PIPE
-		)
+		), toexecute
 
 	def __run_script(self, name: SCRIPTNAME, params: Iterable[str], communicate: bool | str = False) -> str | None:
 		""" Popens script and passes parameters to it
@@ -366,6 +477,47 @@ error_reporting(E_ALL);
 			["php", '-f', pathjoin(self.script_folder, f"{name}.php"), '--', *params],
 			stdout=PIPE, stderr=PIPE
 		)
+  
+	def __run_webservice_function(self, function: str, parameters: dict, namespace: str = "local_lbplanner", as_user: int = 2) -> Any:
+		""" Calls a moodle webservice function via CLI
+
+		:param str functionname: the name of the function to call
+		:param dict parameters: the parameters to pass to the function
+		:param str namespace: the namespace of the function
+		:param int as_user: the id of the user to run this as (1 means guest, 2 means admin, everything else is normal users)
+		:return Popen: the running process
+		"""
+		# NOTE: this is mostly taken from external_api::call_external_function(…);
+		json_data = self.__run_code(f"""\
+			$USER = core_user::get_user({as_user}, '*', MUST_EXIST);
+			$externalfunctioninfo = external_api::external_function_info('{namespace}_{function}');
+			// validate parameters
+			$callable = [$externalfunctioninfo->classname, 'validate_parameters'];
+			$params = call_user_func(
+                $callable,
+                $externalfunctioninfo->parameters_desc,
+                {php_serialize(parameters)}
+            );
+			$params = array_values($params);
+			// call API function
+			$result = call_user_func_array([$externalfunctioninfo->classname, $externalfunctioninfo->methodname], $params);
+			// validate result
+			if ($externalfunctioninfo->returns_desc !== null) {{
+				$result = call_user_func([$externalfunctioninfo->classname, 'clean_returnvalue'], $externalfunctioninfo->returns_desc, $result);
+			}}
+			// return result
+			echo json_encode($result);
+			""",
+			True,
+			["lib/externallib"]
+		)
+  
+		if json_data is None or len(json_data.strip()) == 0:
+			return None
+
+		return json.loads(json_data)
+
+
 	
 	@cached_property
 	def exec_uid(self) -> int:
@@ -381,3 +533,5 @@ error_reporting(E_ALL);
 	def script_folder(self) -> str:
 		""" the folder containing all the scripts we're using """
 		return pathjoin(self.moodledir, "admin/cli/")
+
+

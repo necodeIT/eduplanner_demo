@@ -4,9 +4,9 @@ slots:
     capacity: 30
     mappings:
       - course: literature
-        class: "2A"
-    start: 15
-    weekday: monday
+        class: "1BHIT"
+    start: 4
+    weekday: "saturday"
     duration: 2
     supervisors:
       - prof._elaine_brooks

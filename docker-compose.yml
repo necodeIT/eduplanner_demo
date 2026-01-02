@@ -40,3 +40,5 @@ services:
       - "./.dev/moodle_data:/bitnami/moodle"
       - "./.dev/moodledata_data:/bitnami/moodledata"
       - "./src:/pallasys/cli/src"
+      - "./config:/pallasys/cli/config"
+      - "./schema:/pallasys/cli/schema"

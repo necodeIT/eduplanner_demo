@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from collections.abc import Iterator, Collection
 
-from .model import Task as mTask, User as mUser, Course as mCourse
+from .model import Task as mTask, User as mUser, Course as mCourse, Plan as mPlan, Slot as mSlot
 
 #
 # NOTE: MoodleAdapterOpen and MoodleAdapter are normally the same object,
@@ -47,6 +47,16 @@ class MoodleAdapterOpen(ABC):
 	@abstractmethod
 	def add_grades(self, tasks: Collection[tuple[mUser, mTask]]) -> None:
 		""" sets full-mark grades for the passed tasks """
+		...
+	
+	@abstractmethod
+	def add_plans(self, plans: Collection[mPlan]) -> None:
+		""" sets plans and associated tasks, and such """
+		...
+	
+	@abstractmethod
+	def add_slots(self, slots: Collection[mSlot]) -> None:
+		""" sets slots """
 		...
 
 

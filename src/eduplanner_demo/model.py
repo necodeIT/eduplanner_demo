@@ -1,4 +1,4 @@
-from enum import StrEnum
+from enum import IntEnum, StrEnum
 from dataclasses import dataclass
 from abc import ABC
 from datetime import datetime, timedelta, UTC, timezone
@@ -39,6 +39,15 @@ class TaskStatus(StrEnum):
     SUBMITTED = "submitted"
     """Task has been submitted for review or grading."""
 
+
+class Weekday(IntEnum):
+    MONDAY = 1
+    TUESDAY = 2
+    WEDNESDAY = 3
+    THURSDAY = 4
+    FRIDAY = 5
+    SATURDAY = 6
+    SUNDAY = 7
 
 @dataclass
 class Task(MoodleObject):
@@ -112,16 +121,16 @@ class Clazz(StrEnum):
     - The letter (A/B) indicates the class section within that grade
     """
 
-    A1 = "1A"
-    B1 = "1B"
-    A2 = "2A"
-    B2 = "2B"
-    A3 = "3A"
-    B3 = "3B"
-    A4 = "4A"
-    B4 = "4B"
-    A5 = "5A"
-    B5 = "5B"
+    A1 = "1AHIT"
+    B1 = "1BHIT"
+    A2 = "2AHIT"
+    B2 = "2BHIT"
+    A3 = "3AHIT"
+    B3 = "3BHIT"
+    A4 = "4AHIT"
+    B4 = "4BHIT"
+    A5 = "5AHIT"
+    B5 = "5BHIT"
 
 
 @dataclass
@@ -165,7 +174,7 @@ class Slot(MoodleObject):
     """The starting unit of the slot (1-16)."""
     duration: int
     """The duration of the slot (may not exceed 16 when added to startunit)."""
-    weekday: str
+    weekday: Weekday
     """The weekday of the slot (e.g., 'monday', 'tuesday')."""
     room: str
     """The room where the slot takes place."""
