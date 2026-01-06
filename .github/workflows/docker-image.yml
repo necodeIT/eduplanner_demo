@@ -20,8 +20,6 @@ jobs:
           - name: 🐳 Build and Push
             uses: docker/build-push-action@v6.10.0
             with:
-              provenance: false
               platforms: linux/amd64
               push: true
-              context: .
               tags: ghcr.io/eduplanner-demo:latest
