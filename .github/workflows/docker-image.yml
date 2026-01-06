@@ -22,4 +22,4 @@ jobs:
             with:
               platforms: linux/amd64
               push: true
-              tags: ghcr.io/eduplanner-demo:latest
+              tags: ghcr.io/necodeit/eduplanner_demo:latest
