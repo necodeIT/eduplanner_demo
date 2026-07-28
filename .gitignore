@@ -1,3 +1,8 @@
 __pycache__/
 dist/
+*.egg-info/
 .dev/
+.demo-state/
+.pytest_cache/
+__pycache__/
+.env

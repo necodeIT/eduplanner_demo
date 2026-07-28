@@ -1,574 +1,545 @@
-from os import stat, getuid
-from os.path import realpath, join as pathjoin
-from pwd import getpwuid
-from functools import cached_property
-from subprocess import Popen, PIPE
+from __future__ import annotations
+
 import json
-from enum import StrEnum, auto
-from collections.abc import Iterator, Iterable, Collection
-from contextlib import contextmanager
+import os
+import pwd
+import re
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
 from typing import Any
-from datetime import datetime, UTC, timedelta
-from unittest import result
+from urllib.parse import urlparse
 
-from .logger import Logger
-from .moodleadapter import MoodleAdapter, MoodleAdapterOpen
-from .model import Plan, Slot, User as mUser, Task as mTask, Course as mCourse
-
-#
-# NOTE: All of this essentially works by injecting php code into the moodle codebase (or if you wanna see it that way:
-#       importing the entire moodle codebase into some small php scripts) to abuse their internal functions because yup,
-#       that is indeed the easiest and most robust way of doing it.
-#
-# BEGIN TANGENT
-#       Maybe a custom plugin would be more "proper" but it would be much more effort, less performant, and exactly as
-#       robust - ranging from "not very" to "incredibly", depending on how you view the fact that moodle devs rarely
-#       touch their terrible undocumented internal functions.
-#       Either way, there might be a way to do it using the backup system, but knowing how fragile that is, I'll try
-#       that another time.
-# END
-
-class SCRIPTNAME(StrEnum):
-	MAINTENANCE = auto()
-	PURGE_CACHES = auto()
-
-class DBTable(StrEnum):
-	LBP_COURSES = "local_lbplanner_courses"
-	LBP_KANBANENTRIES = "local_lbplanner_kanbanentries"
-	LBP_NOTIFICATIONS = "local_lbplanner_notification"
-	LBP_PLAN_ACCESS = "local_lbplanner_plan_access"
-	LBP_PLAN_DEADLINES = "local_lbplanner_deadlines"
-	LBP_PLAN_INVITES = "local_lbplanner_plan_invites"
-	LBP_PLANS = "local_lbplanner_plans"
-	LBP_RESERVATIONS = "local_lbplanner_reservations"
-	LBP_SLOTFILTERS = "local_lbplanner_slot_courses"
-	LBP_SLOTS = "local_lbplanner_slots"
-	LBP_SUPERVISORS = "local_lbplanner_supervisors"
-	LBP_USERS = "local_lbplanner_users"
-	COURSES = "course"
-	USERS = "user"
-	SUBMISSIONS = "assign_submission"
-	GRADES = "assign_grades"
-
-def e(orig: str) -> str:
-	""" escapes strings so they can be used for inserting into php single-quoted strings """
-	return orig.replace('\\', '\\\\').replace('\'', "\\'").strip() # should be good enough
-
-def php_serialize(orig: dict | list | str) -> str:
-	""" serializes a string into php code """
-	if isinstance(orig, dict):
-		return '[' + ', '.join([f"{php_serialize(k)}=>{php_serialize(v)}" for k, v in orig.items()]) + ']'
-	elif isinstance(orig, list):
-		return '[' + ", ".join([php_serialize(v) for v in orig]) + ']'
-	elif isinstance(orig, str):
-		return f"'{e(orig)}'"
-	elif isinstance(orig, int) or isinstance(orig, float):
-		return f"{orig}"
-	else:
-		raise NotImplementedError(f"cannot serialize object of type {type(orig)}")
-
-def php_dump(code: str) -> None:
-	""" dumps php code output for debugging purposes """
-	
-	## print with line numbers in different color
+from .logger import Logger, redact
+from .model import DemoConfig
 
 
-class MoodleCLI(MoodleAdapter):
-	""" Connects to a moodle instance via the CLI scripts """
-	__slots__ = ('moodledir')
-
-	moodledir: str
-	""" where moodle is located """
-	
-	def __init__(self, moodledir: str):
-		self.moodledir = realpath(moodledir)
-	
-	@contextmanager
-	def connect(self) -> Iterator[MoodleAdapterOpen]:
-		if self.exec_uid != getuid():
-			raise OSError(f"Must run as {getpwuid(self.exec_uid).pw_name}, {getpwuid(getuid()).pw_name} instead")
-		
-		self.enable_maintenance()
-		try:
-			yield self
-		finally:
-			self.disable_maintenance()
-	
-	def enable_maintenance(self) -> None:
-		""" enables moodle maintenance mode """
-		self.__run_script(SCRIPTNAME.MAINTENANCE, ("--enable",))
-
-	def disable_maintenance(self) -> None:
-		""" disables moodle maintenance mode """
-		self.__run_script(SCRIPTNAME.MAINTENANCE, ("--disable",))
-	
-	def clear(self) -> None:
-		self.__run_code(f"""
-$DB->delete_records("{DBTable.LBP_NOTIFICATIONS}");
-$DB->delete_records("{DBTable.LBP_RESERVATIONS}");
-$DB->delete_records("{DBTable.LBP_SLOTFILTERS}");
-$DB->delete_records("{DBTable.LBP_SLOTS}");
-$DB->delete_records("{DBTable.LBP_PLAN_INVITES}");
-$DB->delete_records("{DBTable.LBP_PLAN_DEADLINES}");
-$DB->delete_records("{DBTable.LBP_PLAN_ACCESS}");
-$DB->delete_records("{DBTable.LBP_PLANS}");
-$DB->delete_records("{DBTable.LBP_SUPERVISORS}");
-$DB->delete_records("{DBTable.LBP_KANBANENTRIES}");
-$DB->delete_records("{DBTable.LBP_COURSES}");
-$DB->delete_records("{DBTable.LBP_USERS}");
-
-$alluserids = $DB->get_fieldset('{DBTable.USERS}', 'id');
-foreach ($alluserids as $userid) {{
-	if ($userid == 1 || $userid == 2) {{
-		continue;
-	}}
-	
-	// sometimes during testing the user table will corrupt. this will safely leak memory in that case.
-	try {{
-		delete_user($DB->get_record('user', ['id' => $userid]));
-	}} catch (dml_missing_record_exception) {{
-		$DB->delete_records('{DBTable.USERS}', ['id' => $userid]);
-	}}
-}}
-$allcourseids = $DB->get_fieldset('{DBTable.COURSES}', 'id');
-foreach ($allcourseids as $courseid) {{
-	delete_course($courseid, false);
-}}
-""")
-
-	def add_users(self, users: Iterable[mUser], token: str) -> None:
-		caplists = {user.name: ",".join([f"'local/lb_planner:{cap}'" for cap in user.capabilities]) for user in users}
-		clazzs = {user.name: f"'{e(user.clazz)}'" if user.clazz is not None else 'null' for user in users}
-		firstnames = {}
-		lastnames = {}
-		
-		for user in users:
-			splitpoint = user.name.rfind(' ')
-			
-			if splitpoint == -1:
-				firstnames[user.name] = user.name
-				lastnames[user.name] = ''
-				continue
-			
-			firstnames[user.name] = user.name[:splitpoint]
-			lastnames[user.name] = user.name[splitpoint + 1:]
-		
-		data = ",".join([
-			f"'{e(user.name.replace(' ', '_'))}'=>"
-			f"['{token}',[{caplists[user.name]}],{clazzs[user.name]},'{e(firstnames[user.name])}','{e(lastnames[user.name])}']"
-			for user in users
-		])
-		stdout = self.__run_code(f"""
-$tocreate = [{data}];
-
-$syscontext = context_system::instance(0, MUST_EXIST, false);
-
-foreach ($tocreate as $usrname => [$passwd, $capabilities, $clazz, $firstname, $lastname]) {{
-	$userid = create_user_record($usrname, $passwd)->id;
-	foreach ($capabilities as $capability) {{
-		$roles = get_roles_with_capability($capability);
-		role_assign(array_key_first($roles), $userid, $syscontext);
-	}}
-	if ($clazz !== null)
-		$DB->set_field('user', 'address', $clazz, ['id' => $userid]);
-	$DB->set_field('user', 'firstname', $firstname, ['id' => $userid]);
-	$DB->set_field('user', 'lastname', $lastname, ['id' => $userid]);
-	$DB->set_field('user', 'email', "user{{$userid}}@example.com", ['id' => $userid]);
-	echo $userid . "\\0";
-}}
-""", True)
-		assert stdout is not None
-		userIDs = stdout[:-1].split('\0')
-		for user, userID in zip(users, userIDs):
-			user.moodleid = int(userID)
-			# get eduplanner user - this creates it for future use
-			self.__run_webservice_function("user_get_user", {}, as_user=user.moodleid)
+JSON_MARKER = "__EDUPLANNER_DEMO_JSON__"
 
 
-	def add_courses(self, courses: Collection[mCourse]) -> None:
-		data = ",".join([
-			f"['fullname' => '{e(course.name)}', 'shortname' => '{e(course.name)}', 'category' => $catid, 'idnumber' => '', 'tags' => ['eduplanner']]"
-			for course in courses
-		])
-		stdout = self.__run_code(f"""
-$catid = core_course_category::get_default()->id;
-$courses = [
-	{data}
-];
-
-foreach ($courses as $course) {{
-	echo create_course((object)$course)->id . "\\0";
-}}
-""", True, ['course/lib'])
-		assert stdout is not None
-		courseIDs = stdout[:-1].split('\0')[:]
-		assert len(courseIDs) == len(courses)
-		for course, courseID in zip(courses, courseIDs):
-			Logger.success(f"Created course '{course.name}' with ID {courseID}")
-			course.moodleid = int(courseID)
-
-	def add_user_enrols(self, user: mUser, courses: Collection[mCourse]) -> None:
-		data = ",".join([f"{course.moodleid}" for course in courses])
-		
-		self.__run_code(f"""
-$courses = [{data}];
-$userid = {user.moodleid};
-
-$studentrole = $DB->get_record('role', ['archetype'=>'student']);
-$enrolplugin = enrol_get_plugin('manual');
-
-foreach ($courses as $courseid) {{
-	$instance = $DB->get_record('enrol', ['courseid' => $courseid, 'enrol' => 'manual']);
-	$enrolplugin->enrol_user($instance, $userid, $studentrole->id);
-}}
-""")
-
-	def add_tasks(self, tasks: Collection[tuple[mCourse, mTask]]) -> None:
-		assigns = ",".join([
-			f"""[
-				'name' => '{e(task.name)}',
-				'description' => '{e(task.description)}',
-				'duedate' => {task.absdue},
-				'courseid' => {course.moodleid},
-				'modulename' => 'assign'
-			]""" for course, task in tasks
-		])
-		
-		stdout = self.__run_code(f"""
-$assigns = [{assigns}];
-
-$USER->id = 2;
-
-foreach ($assigns as $assign) {{
-	$course = get_course($assign['courseid']);
-	[$module, $context, $cw, $cm, $data] = prepare_new_moduleinfo_data($course, 'assign', 1);
-	$data->name = $assign['name'];
-	$data->description = $assign['description'];
-	$data->gradingduedate = $data->cutoffdate = $data->duedate = $assign['duedate'];
-	// setting bullshit needed by some internal function that has zero effect but we need to set it anyway because ????
-	$data->submissiondrafts
-		= $data->requiresubmissionstatement
-		= $data->sendnotifications
-		= $data->sendlatenotifications
-		= $data->allowsubmissionsfromdate
-		= $data->teamsubmission
-		= $data->requireallteammemberssubmit
-		= $data->blindmarking
-		= $data->markingworkflow
-		= $data->markingallocation
-		= false;
-	$data->grade = 100;
-	// setting module and returning assignid
-	echo add_moduleinfo($data, $course)->instance . "\\0";
-}}
-""", True, ["course/modlib", "lib/datalib"])
-		assert stdout is not None
-		taskIDs = stdout[:-1].split('\0')
-		assert len(taskIDs) == len(tasks)
-		for (course, task), taskID in zip(tasks, taskIDs):
-			task.moodleid = int(taskID)
-			Logger.debug(f"Created task '{task.name}' in course '{course.name}' with ID {taskID}")
-
-	def add_submissions(self, tasks: Iterable[tuple[mUser, mTask]]) -> None:
-		data = ",".join([
-			f"['userid' => {user.moodleid}, 'assignment' => {task.moodleid}, 'status' => 'submitted', 'latest' => 1]"
-			for user, task in tasks
-		])
-		self.__run_code(f"""
-$data = [
-	{data}
-];
-$DB->insert_records('{DBTable.SUBMISSIONS}', $data);
-""")
-
-	def add_grades(self, tasks: Iterable[tuple[mUser, mTask]]) -> None:
-		
-		assigns = ",".join([f"[{user.moodleid}, {task.moodleid}]" for user, task in tasks])
-		
-		self.__run_code(f"""
-$assigns = [
-	{assigns}
-];
-
-foreach ($assigns as [$userid, $assignid]) {{
-	$cm = get_coursemodule_from_instance('assign', $assignid, 0, false, MUST_EXIST);
-	$context = context_module::instance($cm->id);
-	$assignment = new assign($context, $cm, null);
-	$grade = $assignment->get_user_grade($userid, true, 1);
-	$grade->grade = 100;
-	$assignment->update_grade($grade);
-}}
-""", imports=["mod/assign/locallib"])
-  
-	def add_plans(self, plans: Collection[Plan]) -> None:
-		for plan in plans:
-			Logger.debug(f"Creating plan '{plan.name}' owned by user ID {plan.owner.moodleid} with members {[m.moodleid for m in plan.members]}")
-			self.__create_plan(plan)
-			Logger.debug(f"Created plan '{plan.name}' for owner ID {plan.owner.moodleid}")
-
-	def add_slots(self, slots: Collection[Slot]) -> None:
-		for slot in slots:
-			Logger.debug(f"Creating slot starting at unit {slot.startunit} on weekday {slot.weekday} in room '{slot.room}' with capacity {slot.capacity}")
-			self.__create_slot(slot)
-			Logger.debug(f"Created slot ID {slot.moodleid} starting at unit {slot.startunit} on weekday {slot.weekday}")
-	
-
-	def __create_slot(self, slot: Slot) -> None:
-		""" creates a slot in moodle """
-		# create slot 
-		result = self.__run_webservice_function("slots_create_slot", {
-			"startunit": slot.startunit,
-			"duration": slot.duration,
-			"weekday": slot.weekday,
-			"room": slot.room,
-			"size": slot.capacity,
-		})
-		slot.moodleid = result['id']
-		
-		# add mappings
-		Logger.debug("Adding slot mappings...")
-		for mapping in slot.mappings:
-			result = self.__run_webservice_function("slots_add_slot_filter", {
-				"slotid": slot.moodleid,
-				"courseid": mapping.course.moodleid,
-				"vintage": mapping.clazz.value,
-			})
-			mapping.moodleid = result['id']
-			Logger.debug(f"Added mapping {mapping.moodleid} to slot {slot.moodleid}")
-
-		
-		# add supervisors
-		Logger.debug("Adding slot supervisors...")
-		for supervisor in slot.supervisors:
-			self.__run_webservice_function("slots_add_slot_supervisor", {
-				"slotid": slot.moodleid,
-				"userid": supervisor.moodleid,
-			})
-			Logger.debug(f"Added supervisor {supervisor.moodleid} to slot {slot.moodleid}")
-  
-	def __create_plan(self, plan: Plan) -> None:
-		""" creates a plan in moodle """
-
-		invites = {}
-	
-		# send invites as plan owner to members
-		Logger.debug("Inviting plan members...")
-		for member in plan.members:
-			
-			result =  self.__run_webservice_function("plan_invite_user", {
-				"inviteeid": member.moodleid
-			}, as_user=plan.owner.moodleid)
-			invites[member.moodleid] = result['id']
-			Logger.debug(f"Invited member {member.moodleid} with invite ID {result['id']}")
-		
-		# accept invites as members
-		Logger.debug("Accepting plan invites...")
-		for user_id, invite_id in invites.items():
-			self.__run_webservice_function("plan_accept_invite", {
-				"inviteid": invite_id
-			}, as_user=user_id)
-			Logger.debug(f"User {user_id} accepted invite ID {invite_id}")
-      
-		# set member access to write
-		Logger.debug("Setting plan member access...")
-		for member in plan.members:
-			self.__run_webservice_function("plan_update_access", {
-				"accesstype": 1,
-				"memberid": member.moodleid
-			}, as_user=plan.owner.moodleid)
-			Logger.debug(f"Set member {member.moodleid} access to write")
-	
-	
-		# rename plan to plan.name
-		Logger.debug("Renaming plan...")
-		self.__run_webservice_function("plan_update_plan", {
-      		"planname": plan.name,
-      	}, as_user=plan.owner.moodleid)
-		Logger.debug(f"Renamed plan to '{plan.name}'")
-		
-  
-		now = datetime.now(UTC)
+class MoodleError(RuntimeError):
+    pass
 
 
-  
-		# add deadlines to owner's plan
-		Logger.debug("Adding plan deadlines...")
-		for deadline in plan.deadlines:
-			# UTC+0 unix timestamp from start/end
-			start = now + timedelta(days=deadline.deadlinestart)
-			end = start + timedelta(days=deadline.duration)
-			self.__run_webservice_function("plan_set_deadline", {
-				"moduleid": deadline.task.moodleid,
-				"deadlinestart": int(start.timestamp()),
-				"deadlineend": int(end.timestamp()),
-			}, as_user=plan.owner.moodleid)
-			Logger.debug(f"Added deadline for task {deadline.task.moodleid} from {start.isoformat()} to {end.isoformat()}")
+class MoodleCLI:
+    """Execute supported Moodle APIs from the container without requiring a user switch."""
 
+    def __init__(self, moodle_dir: str | Path | None = None):
+        self.moodle_dir = Path(moodle_dir or os.getenv("DEMO_MOODLE_DIR", "/bitnami/moodle")).resolve()
+        self.config_php = self.moodle_dir / "config.php"
 
-	def __run_code(self, code: str, communicate: bool | str = False, imports: Iterable[str] = []) -> str | None:
-		""" Popens code and stuff
+    def ready(self) -> bool:
+        return self.config_php.is_file()
 
-		:param str code: the php code to execute
-		:param bool|str: communicate: whether to communicate with the script - will be passed to stdin if string
-		:return str|None: stdout if communicate was true, None otherwise
-		"""
-		out: bytes | None = None
-		err: bytes | None = None
-		_p, finalcode = self.__popen_code(code, imports)
-		with _p as p:
-			if communicate:
-				out, err = p.communicate(communicate if isinstance(communicate, str) else None)
-			
-			if p.wait() != 0:
-				if not communicate:
-					assert p.stderr is not None
-					err = p.stderr.read()
-				
-				assert err is not None
+    def runtime_account(self) -> tuple[int, int, str]:
+        configured = os.getenv("DEMO_MOODLE_USER", "daemon")
+        try:
+            account = pwd.getpwuid(int(configured)) if configured.isdigit() else pwd.getpwnam(configured)
+        except KeyError as error:
+            raise MoodleError(f"Moodle runtime user does not exist: {configured}") from error
+        return account.pw_uid, account.pw_gid, account.pw_name
 
-				Logger.error("Encountered error in injected code")
-				Logger.debug(err.decode('utf-8'))
-				Logger.code(finalcode)
-				exit(1)
-		
-		return None if out is None else out.decode('utf-8')
+    def _command(self) -> list[str]:
+        php = shutil.which("php") or "/opt/bitnami/php/bin/php"
+        command = [php, "-r"]
+        if os.geteuid() != 0 or not shutil.which("gosu"):
+            return command
+        _, group, name = self.runtime_account()
+        return ["gosu", f"{name}:{group}", *command]
 
-	def __popen_code(self, code: str, imports: Iterable[str] = []) -> tuple[Popen, str]:
-		""" Popens custom php code with moodle context
-
-		:param str code: the php code to execute
-		:return tuple[Popen, str]: the running process and the bootstrapped code
-		"""
-		
-		imports = ['config', *imports]
-		
-		bootstrap = """\
+    def run_php(self, body: str, payload: Any = None) -> Any:
+        if not self.ready():
+            raise MoodleError(f"Moodle is not installed at {self.moodle_dir}")
+        bootstrap = f"""
 define('CLI_SCRIPT', true);
-ini_set('display_errors', '1');
-ini_set('display_startup_errors', '1');
+define('NO_OUTPUT_BUFFERING', true);
+require {json.dumps(str(self.config_php))};
 error_reporting(E_ALL);
+ini_set('display_errors', 'stderr');
+$USER = get_admin();
+$inputjson = stream_get_contents(STDIN);
+$input = $inputjson === '' ? [] : json_decode($inputjson, true, 512, JSON_THROW_ON_ERROR);
+function demo_result(mixed $value): void {{
+    echo "\\n{JSON_MARKER}" . json_encode($value, JSON_THROW_ON_ERROR) . "\\n";
+}}
+{body}
 """
-		
-		for i in imports:
-			# TODO: check if file exists for better exception reporting
-			fn = f"{i}.php"
-			bootstrap += f"require_once('{pathjoin(self.moodledir, fn)}');"
-		
-		toexecute = f"{bootstrap}{code}"
-		
-		return Popen(
-			["php", '-r', toexecute, '--'],
-			stdout=PIPE, stderr=PIPE
-		), toexecute
+        command = [*self._command(), bootstrap]
+        Logger.debug(f"Moodle PHP command: {command[:2]} <php-code>")
+        process = subprocess.run(
+            command,
+            input=json.dumps(payload or {}, ensure_ascii=False),
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if process.returncode != 0:
+            Logger.debug(redact(process.stderr))
+            raise MoodleError(
+                f"Moodle PHP operation failed with exit code {process.returncode}: "
+                f"{redact(process.stderr.strip() or process.stdout.strip())}"
+            )
+        marker = process.stdout.rfind(JSON_MARKER)
+        if marker < 0:
+            if process.stdout.strip():
+                Logger.debug(process.stdout.strip())
+            return None
+        raw = process.stdout[marker + len(JSON_MARKER) :].strip().splitlines()[0]
+        return json.loads(raw)
 
-	def __run_script(self, name: SCRIPTNAME, params: Iterable[str], communicate: bool | str = False) -> str | None:
-		""" Popens script and passes parameters to it
+    def _configure_origin(self, base_url: str) -> bool:
+        """Persist the selected public origin and proxy mode in Bitnami's config.php."""
+        proxy_mode = urlparse(base_url).scheme == "https"
+        escaped_url = base_url.replace("\\", "\\\\").replace("'", "\\'")
+        start = "// BEGIN EDUPLANNER DEMO ORIGIN"
+        end = "// END EDUPLANNER DEMO ORIGIN"
+        block = (
+            f"{start}\n"
+            f"$CFG->wwwroot = '{escaped_url}';\n"
+            f"$CFG->reverseproxy = {'true' if proxy_mode else 'false'};\n"
+            f"$CFG->sslproxy = {'true' if proxy_mode else 'false'};\n"
+            f"{end}"
+        )
+        source = self.config_php.read_text(encoding="utf-8")
+        pattern = re.compile(rf"{re.escape(start)}.*?{re.escape(end)}", re.DOTALL)
+        if pattern.search(source):
+            updated = pattern.sub(block, source)
+        else:
+            anchor = "require_once(__DIR__ . '/lib/setup.php');"
+            if anchor not in source:
+                raise MoodleError("Moodle config.php has no setup.php bootstrap anchor")
+            updated = source.replace(anchor, f"{block}\n\n{anchor}", 1)
+        if updated == source:
+            return proxy_mode
 
-		:param SCRIPTNAME name: name of the script to execute
-		:param Iterable[str] params: parameters to pass to the script
-		:param bool|str communicate: whether to communicate with the script - will be passed to stdin if string
-		:return str|None: stdout if communicate was true, None otherwise
-		"""
-  
-		out: bytes | None = None
-		err: bytes | None = None
-		with self.__popen_script(name, params) as p:
-			if communicate:
-				out, err = p.communicate(communicate if isinstance(communicate, str) else None)
-			
-			if p.wait() != 0:
-				if not communicate:
-					assert p.stderr is not None
-					err = p.stderr.read()
-				
-				assert err is not None
+        metadata = self.config_php.stat()
+        descriptor, name = tempfile.mkstemp(prefix=".config.php.", dir=self.config_php.parent)
+        temporary = Path(name)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                handle.write(updated)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(temporary, metadata.st_mode & 0o777)
+            if os.geteuid() == 0:
+                os.chown(temporary, metadata.st_uid, metadata.st_gid)
+            os.replace(temporary, self.config_php)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return proxy_mode
 
-				Logger.error(f"Encountered error in script {name}:")
-				Logger.debug(f"{err.decode('utf-8')}")
-				Logger.debug(f"Script Parameters: {params}")
-				exit(1)
-		
-		return None if out is None else out.decode('utf-8')
+    def configure(self, base_url: str) -> dict[str, Any]:
+        proxy_mode = self._configure_origin(base_url)
+        return self.run_php(
+            r"""
+global $CFG, $DB;
+if (rtrim((string)$CFG->wwwroot, '/') !== $input['baseUrl']) {
+    throw new moodle_exception('Configured Moodle wwwroot does not match DEMO_BASE_URL');
+}
+if ((bool)!empty($CFG->reverseproxy) !== (bool)$input['proxyMode'] ||
+        (bool)!empty($CFG->sslproxy) !== (bool)$input['proxyMode']) {
+    throw new moodle_exception('Moodle proxy settings do not match DEMO_BASE_URL');
+}
+set_config('enablewebservices', 1);
+set_config('webserviceprotocols', 'rest');
+set_config('debug', E_ALL);
+set_config('debugdisplay', 1);
+set_config('auth', implode(',', array_values(array_unique(array_filter([
+    ...explode(',', (string)get_config('core', 'auth')),
+    'manual',
+    'edudemo',
+])))));
 
-	def __popen_script(self, name: SCRIPTNAME, params: Iterable[str]) -> Popen:
-		""" Popens script and passes parameters to it
+$userrole = $DB->get_record('role', ['archetype' => 'user'], '*', MUST_EXIST);
+assign_capability('moodle/webservice:createtoken', CAP_ALLOW, $userrole->id, context_system::instance()->id, true);
+assign_capability('webservice/rest:use', CAP_ALLOW, $userrole->id, context_system::instance()->id, true);
+accesslib_clear_all_caches(true);
 
-		:param SCRIPTNAME name: name of the script to execute
-		:param Iterable[str] params: parameters to pass to the script
-		:return Popen: the running process
-		"""
-		return Popen(
-			["php", '-f', pathjoin(self.script_folder, f"{name}.php"), '--', *params],
-			stdout=PIPE, stderr=PIPE
-		)
-  
-	def __run_webservice_function(self, function: str, parameters: dict, namespace: str = "local_lbplanner", as_user: int = 2) -> Any:
-		""" Calls a moodle webservice function via CLI
+$plugin = core_plugin_manager::instance()->get_plugin_info('local_lbplanner');
+if (!$plugin) {
+    throw new moodle_exception('LB Planner plugin is not installed');
+}
+$service = $DB->get_record('external_services', ['shortname' => 'lb_planner_sync_api'], '*', MUST_EXIST);
+if (!$service->enabled) {
+    $service->enabled = 1;
+    $DB->update_record('external_services', $service);
+}
+demo_result([
+    'moodleRelease' => $CFG->release,
+    'pluginRelease' => $plugin->release,
+    'serviceId' => $service->id,
+    'baseUrl' => $input['baseUrl'],
+]);
+""",
+            {"baseUrl": base_url, "proxyMode": proxy_mode},
+        )
 
-		:param str functionname: the name of the function to call
-		:param dict parameters: the parameters to pass to the function
-		:param str namespace: the namespace of the function
-		:param int as_user: the id of the user to run this as (1 means guest, 2 means admin, everything else is normal users)
-		:return Popen: the running process
-		"""
-		Logger.debug(f"Calling webservice function {namespace}_{function} as user ID {as_user} with parameters {parameters}")
-		# NOTE: this is mostly taken from external_api::call_external_function(…);
-		json_data = self.__run_code(f"""\
-			$USER = core_user::get_user({as_user}, '*', MUST_EXIST);
-			$externalfunctioninfo = external_api::external_function_info('{namespace}_{function}');
-			// validate parameters
-			$callable = [$externalfunctioninfo->classname, 'validate_parameters'];
-			$params = call_user_func(
-                $callable,
-                $externalfunctioninfo->parameters_desc,
-                {php_serialize(parameters)}
-            );
-			$params = array_values($params);
-			// call API function
-			$result = call_user_func_array([$externalfunctioninfo->classname, $externalfunctioninfo->methodname], $params);
-			// validate result
-			if ($externalfunctioninfo->returns_desc !== null) {{
-				$result = call_user_func([$externalfunctioninfo->classname, 'clean_returnvalue'], $externalfunctioninfo->returns_desc, $result);
-			}}
-			// return result
-			echo json_encode($result);
-			""",
-			True,
-			["lib/externallib"]
-		)
-  
-		if json_data is None or len(json_data.strip()) == 0:
-			Logger.debug("Webservice function returned no data")
-			return None
+    def diagnostics(self) -> dict[str, Any]:
+        return self.run_php(
+            r"""
+global $CFG, $DB;
+$planner = core_plugin_manager::instance()->get_plugin_info('local_lbplanner');
+$customfields = core_plugin_manager::instance()->get_plugin_info('local_modcustomfields');
+$service = $DB->get_record('external_services', ['shortname' => 'lb_planner_sync_api']);
+demo_result([
+    'phpVersion' => PHP_VERSION,
+    'moodleRelease' => $CFG->release,
+    'siteUrl' => $CFG->wwwroot,
+    'reverseProxy' => !empty($CFG->reverseproxy),
+    'sslProxy' => !empty($CFG->sslproxy),
+    'webServices' => !empty($CFG->enablewebservices),
+    'restEnabled' => in_array('rest', array_filter(explode(',', (string)($CFG->webserviceprotocols ?? ''))), true),
+    'serviceEnabled' => $service ? !empty($service->enabled) : false,
+    'pluginRelease' => $planner ? $planner->release : null,
+    'customFieldsVersion' => $customfields ? $customfields->versiondisk : null,
+]);
+"""
+        )
 
-		json_result = json.loads(json_data)
-  
-		if json_result is None:
-			Logger.debug("Webservice function returned null")
-			return None
-  
-		if 'error' in json_result:
-			Logger.error(f"Webservice function {namespace}_{function} returned error: {json_result['error']['message']}")
-			Logger.debug(json_data)
-			exit(1)
-  
-		return json_result
+    def enable_maintenance(self) -> None:
+        self._run_cli("maintenance.php", "--enable")
 
+    def disable_maintenance(self) -> None:
+        self._run_cli("maintenance.php", "--disable")
 
-	
-	@cached_property
-	def exec_uid(self) -> int:
-		""" the UID of the user to execute moodle stuff as (meant to be apache, httpd, etc.) """
-		return stat(self.lbp_folder).st_uid
-	
-	@cached_property
-	def lbp_folder(self) -> str:
-		""" the folder containing Eduplanner """
-		return pathjoin(self.moodledir, "local/lbplanner/")
-	
-	@cached_property
-	def script_folder(self) -> str:
-		""" the folder containing all the scripts we're using """
-		return pathjoin(self.moodledir, "admin/cli/")
+    def purge_caches(self) -> None:
+        self._run_cli("purge_caches.php")
 
+    def _run_cli(self, script: str, *parameters: str) -> None:
+        php = shutil.which("php") or "/opt/bitnami/php/bin/php"
+        command = [php, str(self.moodle_dir / "admin" / "cli" / script), *parameters]
+        if os.geteuid() == 0 and shutil.which("gosu"):
+            _, group, name = self.runtime_account()
+            command = ["gosu", f"{name}:{group}", *command]
+        process = subprocess.run(command, text=True, capture_output=True, check=False)
+        if process.returncode:
+            raise MoodleError(redact(process.stderr.strip() or process.stdout.strip()))
+        Logger.debug(process.stdout.strip())
 
+    def reset(self) -> dict[str, int]:
+        return self.run_php(
+            r"""
+global $CFG, $DB;
+require_once($CFG->dirroot . '/user/lib.php');
+require_once($CFG->dirroot . '/course/lib.php');
+$deletedusers = 0;
+$adminids = array_map('intval', array_keys(get_admins()));
+foreach ($DB->get_records_select('user', 'id > 2 AND deleted = 0') as $user) {
+    if (in_array((int)$user->id, $adminids, true)) {
+        continue;
+    }
+    if (delete_user($user)) {
+        $deletedusers++;
+    }
+}
+$deletedcourses = 0;
+foreach ($DB->get_records_select('course', 'id <> :siteid', ['siteid' => SITEID]) as $course) {
+    delete_course($course, false);
+    $deletedcourses++;
+}
+demo_result(['users' => $deletedusers, 'courses' => $deletedcourses]);
+"""
+        )
+
+    def create_content(self, config: DemoConfig) -> dict[str, Any]:
+        return self.run_php(
+            r"""
+global $CFG, $DB, $USER;
+require_once($CFG->dirroot . '/course/lib.php');
+require_once($CFG->dirroot . '/course/modlib.php');
+require_once($CFG->dirroot . '/group/lib.php');
+require_once($CFG->dirroot . '/mod/quiz/locallib.php');
+require_once($CFG->libdir . '/questionlib.php');
+
+function edudemo_add_quiz_question(stdClass $quiz, int $cmid, string $activityname): void {
+    $category = question_get_top_category(context_module::instance($cmid)->id, true);
+    if (!$category) {
+        throw new moodle_exception('Unable to create a question category for demo quiz');
+    }
+
+    $form = (object)[
+        'category' => $category->id . ',' . $category->contextid,
+        'name' => $activityname . ' demo question',
+        'questiontext' => [
+            'text' => 'This is an automatically generated EduPlanner demo question.',
+            'format' => FORMAT_HTML,
+        ],
+        'defaultmark' => 1,
+        'generalfeedback' => ['text' => '', 'format' => FORMAT_HTML],
+        'correctanswer' => '1',
+        'feedbacktrue' => ['text' => 'Correct.', 'format' => FORMAT_HTML],
+        'feedbackfalse' => ['text' => 'Incorrect.', 'format' => FORMAT_HTML],
+        'penalty' => 1,
+        'status' => core_question\local\bank\question_version_status::QUESTION_STATUS_READY,
+    ];
+    $question = question_bank::get_qtype('truefalse')->save_question(
+        (object)['qtype' => 'truefalse'],
+        $form,
+    );
+    quiz_add_quiz_question($question->id, $quiz, 1, 1);
+    mod_quiz\quiz_settings::create($quiz->id)->get_grade_calculator()->recompute_quiz_sumgrades();
+}
+
+$categoryid = core_course_category::get_default()->id;
+$result = ['courses' => [], 'activities' => [], 'groups' => []];
+$classes = [];
+foreach ($input['users'] as $user) {
+    if ($user['role'] !== 'student' || empty($user['class'])) {
+        continue;
+    }
+    foreach ($user['courses'] as $courseid) {
+        $classes[$courseid][$user['class']] = true;
+    }
+}
+
+foreach ($input['courses'] as $courseinput) {
+    $course = create_course((object)[
+        'fullname' => $courseinput['name'],
+        'shortname' => $courseinput['id'],
+        'idnumber' => 'edudemo:' . $courseinput['id'],
+        'category' => $categoryid,
+        'enablecompletion' => 1,
+        'startdate' => time(),
+        'enddate' => 0,
+    ]);
+    $result['courses'][$courseinput['id']] = (int)$course->id;
+    $result['groups'][$courseinput['id']] = [];
+    foreach (array_keys($classes[$courseinput['id']] ?? []) as $classname) {
+        $groupid = groups_create_group((object)[
+            'courseid' => $course->id,
+            'name' => $classname,
+            'idnumber' => 'edudemo:' . $courseinput['id'] . ':' . $classname,
+            'description' => 'EduPlanner demo class group',
+            'descriptionformat' => FORMAT_PLAIN,
+        ]);
+        $result['groups'][$courseinput['id']][$classname] = (int)$groupid;
+    }
+
+    foreach ($courseinput['activities'] as $activityinput) {
+        $modname = $activityinput['type'] === 'quiz' ? 'quiz' : 'assign';
+        [$module, $context, $cw, $cm, $data] = prepare_new_moduleinfo_data($course, $modname, 1);
+        $data->name = $activityinput['name'];
+        $data->cmidnumber = '';
+        $data->intro = $activityinput['description'];
+        $data->introformat = FORMAT_HTML;
+        $data->introeditor = [
+            'text' => $activityinput['description'],
+            'format' => FORMAT_HTML,
+            'itemid' => 0,
+        ];
+        $data->completion = COMPLETION_TRACKING_MANUAL;
+        if ($modname === 'assign') {
+            $data->duedate = $activityinput['deadline'];
+            $data->cutoffdate = 0;
+            $data->gradingduedate = $activityinput['deadline'];
+            $data->grade = 100;
+            $data->allowsubmissionsfromdate = 0;
+            $data->alwaysshowdescription = 1;
+            $data->submissiondrafts = 0;
+            $data->requiresubmissionstatement = 0;
+            $data->sendnotifications = 0;
+            $data->sendlatenotifications = 0;
+            $data->teamsubmission = 0;
+            $data->requireallteammemberssubmit = 0;
+            $data->blindmarking = 0;
+            $data->markingworkflow = 0;
+            $data->markingallocation = 0;
+        } else {
+            $data->timeopen = 0;
+            $data->timeclose = $activityinput['deadline'];
+            $data->timelimit = 0;
+            $data->overduehandling = 'autosubmit';
+            $data->graceperiod = 0;
+            $data->preferredbehaviour = 'deferredfeedback';
+            $data->attempts = 0;
+            $data->attemptonlast = 0;
+            $data->grademethod = QUIZ_GRADEHIGHEST;
+            $data->decimalpoints = 2;
+            $data->questiondecimalpoints = -1;
+            $data->grade = 100;
+            $data->questionsperpage = 1;
+            $data->navmethod = QUIZ_NAVMETHOD_FREE;
+            $data->shuffleanswers = 1;
+            $data->sumgrades = 0;
+            foreach (['during', 'immediately', 'open', 'closed'] as $reviewstate) {
+                foreach (['attempt', 'correctness', 'maxmarks', 'marks', 'specificfeedback',
+                    'generalfeedback', 'rightanswer', 'overallfeedback'] as $reviewfield) {
+                    $property = $reviewfield . $reviewstate;
+                    $data->{$property} = ($reviewstate === 'during' && $reviewfield === 'overallfeedback') ? 0 : 1;
+                }
+            }
+            $data->quizpassword = '';
+            $data->subnet = '';
+            $data->browsersecurity = '';
+            $data->delay1 = 0;
+            $data->delay2 = 0;
+            $data->showuserpicture = 0;
+            $data->showblocks = 0;
+        }
+        $created = add_moduleinfo($data, $course);
+        $instanceid = (int)$created->instance;
+        $cmid = (int)$created->coursemodule;
+        if ($modname === 'quiz') {
+            $quiz = $DB->get_record('quiz', ['id' => $instanceid], '*', MUST_EXIST);
+            edudemo_add_quiz_question($quiz, $cmid, $activityinput['name']);
+        }
+        if (!empty($activityinput['classification'])) {
+            $category = core_customfield\category_controller::create((int)get_config(
+                'local_lbplanner',
+                local_lbplanner\sync\classification::CONFIG_CATEGORY_ID,
+            ));
+            $savedclassification = false;
+            foreach ($category->get_handler()->get_instance_data($cmid, true) as $fielddata) {
+                if ($fielddata->get_field()->get('shortname') !== local_lbplanner\sync\classification::FIELD_SHORTNAME) {
+                    continue;
+                }
+                $fielddata->set(
+                    $fielddata->datafield(),
+                    $fielddata->get_field()->parse_value($activityinput['classification']),
+                );
+                $fielddata->set('contextid', context_module::instance($cmid)->id);
+                $fielddata->save();
+                $savedclassification = true;
+                break;
+            }
+            if (!$savedclassification) {
+                throw new moodle_exception('LB Planner classification field was not found');
+            }
+        }
+        $result['activities'][$activityinput['id']] = [
+            'type' => $activityinput['type'],
+            'instanceId' => $instanceid,
+            'courseModuleId' => $cmid,
+            'courseId' => (int)$course->id,
+        ];
+    }
+}
+demo_result($result);
+""",
+            config.as_wire_dict(),
+        )
+
+    def create_users(self, config: DemoConfig, content: dict[str, Any]) -> dict[str, int]:
+        payload = config.as_wire_dict()
+        payload["created"] = content
+        return self.run_php(
+            r"""
+global $CFG, $DB, $USER;
+require_once($CFG->dirroot . '/user/lib.php');
+require_once($CFG->dirroot . '/group/lib.php');
+require_once($CFG->dirroot . '/lib/enrollib.php');
+$enrol = enrol_get_plugin('manual');
+$studentrole = $DB->get_record('role', ['archetype' => 'student'], '*', MUST_EXIST);
+$teacherrole = $DB->get_record('role', ['archetype' => 'editingteacher'], '*', MUST_EXIST);
+$ids = [];
+foreach ($input['users'] as $userinput) {
+    $record = create_user_record($userinput['id'], $input['password'], 'manual');
+    $parts = preg_split('/\s+/', trim($userinput['name']));
+    $record->lastname = count($parts) > 1 ? array_pop($parts) : '-';
+    $record->firstname = implode(' ', $parts) ?: $userinput['name'];
+    $record->email = $userinput['id'] . '@example.invalid';
+    $record->idnumber = 'edudemo:' . $userinput['id'];
+    $record->address = $userinput['class'] ?? '';
+    user_update_user($record, false, false);
+    $ids[$userinput['id']] = (int)$record->id;
+    foreach ($userinput['courses'] as $coursekey) {
+        $courseid = $input['created']['courses'][$coursekey];
+        $instance = $DB->get_record('enrol', ['courseid' => $courseid, 'enrol' => 'manual'], '*', MUST_EXIST);
+        $roleid = $userinput['role'] === 'teacher' ? $teacherrole->id : $studentrole->id;
+        $enrol->enrol_user($instance, $record->id, $roleid, 0, 0, ENROL_USER_ACTIVE);
+        if ($userinput['role'] === 'student' && !empty($userinput['class'])) {
+            $groupid = $input['created']['groups'][$coursekey][$userinput['class']] ?? null;
+            if ($groupid) {
+                groups_add_member($groupid, $record->id);
+            }
+        }
+    }
+}
+set_config('credentials', json_encode(array_map(
+    fn($user) => ['name' => $user['name'], 'username' => $user['id'], 'password' => $input['password']],
+    $input['users']
+)), 'local_edudemo');
+demo_result($ids);
+""",
+            payload,
+        )
+
+    def apply_states(
+        self, config: DemoConfig, content: dict[str, Any], users: dict[str, int]
+    ) -> dict[str, int]:
+        payload = config.as_wire_dict()
+        payload["created"] = content
+        payload["userIds"] = users
+        return self.run_php(
+            r"""
+global $CFG, $DB, $USER;
+require_once($CFG->dirroot . '/mod/assign/locallib.php');
+require_once($CFG->dirroot . '/mod/quiz/locallib.php');
+$submitted = 0;
+$completed = 0;
+foreach ($input['users'] as $userinput) {
+    $userid = $input['userIds'][$userinput['id']];
+    $USER = core_user::get_user($userid, '*', MUST_EXIST);
+    foreach ($userinput['taskStatus'] as $taskid => $status) {
+        $activity = $input['created']['activities'][$taskid];
+        $cm = get_coursemodule_from_id('', $activity['courseModuleId'], 0, false, MUST_EXIST);
+        $course = get_course($activity['courseId']);
+        $context = context_module::instance($cm->id);
+        if ($activity['type'] === 'assignment') {
+            $assignment = new assign($context, $cm, $course);
+            $submission = $assignment->get_user_submission($userid, true);
+            $submission->status = ASSIGN_SUBMISSION_STATUS_SUBMITTED;
+            $submission->timemodified = time();
+            $DB->update_record('assign_submission', $submission);
+            if ($status === 'completed') {
+                $grade = $assignment->get_user_grade($userid, true);
+                $grade->grade = 100;
+                $grade->grader = 2;
+                $grade->timemodified = time();
+                $assignment->update_grade($grade);
+            }
+        } else {
+            $quizobj = mod_quiz\quiz_settings::create($activity['instanceId'], $userid);
+            $attempt = quiz_prepare_and_start_new_attempt($quizobj, 1, null, false);
+            $attemptobj = mod_quiz\quiz_attempt::create($attempt->id);
+            $attemptobj->process_submitted_actions(time(), false, [
+                1 => ['answer' => $status === 'completed' ? '1' : '0'],
+            ]);
+            $attemptobj->process_finish(time(), false);
+        }
+        $submitted++;
+        if ($status === 'completed') {
+            $completion = new completion_info($course);
+            $completion->update_state($cm, COMPLETION_COMPLETE, $userid);
+            $completed++;
+        }
+    }
+}
+demo_result(['submitted' => $submitted, 'completed' => $completed]);
+""",
+            payload,
+        )
+
+    def internal_doctor(self, representative_user_id: int) -> dict[str, Any]:
+        return self.run_php(
+            r"""
+global $CFG, $USER;
+require_once($CFG->libdir . '/externallib.php');
+$USER = core_user::get_user($input['userId'], '*', MUST_EXIST);
+$functions = [
+    'local_lbplanner_sync_get_identity',
+    'local_lbplanner_sync_get_courses',
+    'local_lbplanner_sync_get_assignments',
+    'local_lbplanner_sync_get_quizzes',
+];
+$result = [];
+foreach ($functions as $function) {
+    $info = external_api::external_function_info($function);
+    $value = call_user_func([$info->classname, $info->methodname]);
+    $result[$function] = is_array($value) ? count($value) : $value;
+}
+demo_result($result);
+""",
+            {"userId": representative_user_id},
+        )

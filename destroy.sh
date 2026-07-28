@@ -1,4 +1,3 @@
 #!/bin/bash
-
-docker-compose down
-sudo rm -rf .dev
+set -euo pipefail
+docker compose down --volumes --remove-orphans

@@ -6,26 +6,31 @@ courses:
           Build comfort with linear equations, factoring, and polynomial manipulation.
         due: 3
         type: assignment
+        classification: GK
       - name: Integrals
         description: |
           Solve definite and indefinite integrals with substitution and by parts.
         due: 5
         type: assignment
+        classification: EK
       - name: Derivatives
         description: |
           Differentiate polynomial, exponential, and trigonometric functions; interpret rates of change.
         due: 4
         type: assignment
+        classification: M
       - name: Midterm Exam
         description: |
           Exam on limits, derivatives, and basic integration techniques.
         due: 10
-        type: exam
+        type: quiz
+        classification: TEST
       - name: Final Exam
         description: |
           Cumulative exam covering all calculus topics from the term.
         due: 18
-        type: exam
+        type: quiz
+        classification: TEST
   - name: Physics
     tasks:
       - name: Mechanics
@@ -33,21 +38,25 @@ courses:
           Work through kinematics and Newton's laws problem sets with free-body diagrams.
         due: 4
         type: assignment
+        classification: GK
       - name: Electricity and Magnetism
         description: |
           Analyze circuits with Ohm's law and apply Maxwell's equations to simple field problems.
         due: 6
         type: assignment
+        classification: EK
       - name: Waves and Optics
         description: |
           Model wave interference, diffraction, and basic lens systems.
         due: 8
         type: assignment
+        classification: M
       - name: Final Exam
         description: |
           Comprehensive physics exam spanning mechanics through optics.
         due: 14
-        type: exam
+        type: quiz
+        classification: TEST
   - name: Literature
     tasks:
       - name: Poetry Analysis
@@ -55,21 +64,25 @@ courses:
           Close-read assigned poems focusing on meter, imagery, and tone in a short response.
         due: 3
         type: assignment
+        classification: GK
       - name: Modern Novel Essay
         description: |
           Write a thesis-driven essay on character development in the selected modern novel.
         due: 6
         type: assignment
+        classification: EK
       - name: Research Presentation
         description: |
           Present findings on a chosen author, including historical context and critical reception.
         due: 10
         type: assignment
+        classification: M
       - name: Final Exam
         description: |
           In-class essay exam comparing themes across the semester's readings.
         due: 15
-        type: exam
+        type: quiz
+        classification: TEST
   - name: Computer Science
     tasks:
       - name: Intro to Programming
@@ -77,18 +90,22 @@ courses:
           Implement basic control flow and functions in Python to solve small algorithmic problems.
         due: 2
         type: assignment
+        classification: GK
       - name: Data Structures
         description: |
           Build and test list, stack, and queue implementations with time-complexity notes.
         due: 6
         type: assignment
+        classification: EK
       - name: Algorithms Quiz
         description: |
           Short assessment on recursion, searching, and sorting fundamentals.
         due: 7
-        type: exam
+        type: quiz
+        classification: TEST
       - name: Capstone Project
         description: |
           Develop a small CLI app with documentation and unit tests, to be demoed in class.
         due: 14
         type: assignment
+        classification: M

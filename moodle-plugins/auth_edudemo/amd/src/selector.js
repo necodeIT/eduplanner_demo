@@ -1,0 +1,54 @@
+define([], function() {
+    const fillInput = (input, value) => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        setter.call(input, value);
+        input.dispatchEvent(new Event('input', {bubbles: true}));
+        input.dispatchEvent(new Event('change', {bubbles: true}));
+    };
+
+    const init = (credentials) => {
+        const username = document.querySelector('input[name="username"]');
+        const password = document.querySelector('input[name="password"]');
+        const form = username && username.closest('form');
+        if (!username || !password || !form || form.querySelector('[data-edudemo-selector]')) {
+            return;
+        }
+        const wrapper = document.createElement('div');
+        wrapper.className = 'mb-3';
+        wrapper.dataset.edudemoSelector = 'true';
+        const label = document.createElement('label');
+        label.className = 'form-label';
+        label.textContent = 'Demo account';
+        const select = document.createElement('select');
+        select.className = 'form-control custom-select';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Choose a demo user…';
+        select.appendChild(placeholder);
+        credentials.forEach((credential, index) => {
+            const option = document.createElement('option');
+            option.value = String(index);
+            option.textContent = `${credential.name} (${credential.username})`;
+            select.appendChild(option);
+        });
+        select.addEventListener('change', () => {
+            if (select.value === '') {
+                return;
+            }
+            const selected = credentials[Number(select.value)];
+            // Moodle's ToggleSensitive module asynchronously replaces the password input.
+            // Resolve both fields at selection time instead of retaining detached elements.
+            const liveUsername = form.querySelector('input[name="username"]');
+            const livePassword = form.querySelector('input[name="password"]');
+            if (!liveUsername || !livePassword) {
+                return;
+            }
+            fillInput(liveUsername, selected.username);
+            fillInput(livePassword, selected.password);
+            livePassword.focus();
+        });
+        wrapper.append(label, select);
+        form.insertBefore(wrapper, username.closest('.mb-3') || form.firstChild);
+    };
+    return {init};
+});

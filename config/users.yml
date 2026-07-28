@@ -1,9 +1,11 @@
 password: "1234"
 users:
   - name: Alice Johnson
-    capabilities:
-      - student
+    role: student
     class: "1AHIT"
+    courses:
+      - mathematics
+      - physics
     task-status:
       mathematics.algebra_foundations: completed
       mathematics.integrals: submitted
@@ -11,18 +13,26 @@ users:
       physics.electricity_and_magnetism: submitted
 
   - name: Brian Patel
-    capabilities:
-      - student
+    role: student
     class: "1BHIT"
+    courses:
+      - mathematics
+      - physics
+      - literature
+      - computer_science
     task-status:
       mathematics.derivatives: submitted
       literature.poetry_analysis: completed
       computer_science.intro_to_programming: completed
       physics.electricity_and_magnetism: submitted
   - name: Carla Nguyen
-    capabilities:
-      - student
+    role: student
     class: "2AHIT"
+    courses:
+      - mathematics
+      - physics
+      - literature
+      - computer_science
     task-status:
       mathematics.midterm_exam: submitted
       mathematics.final_exam: submitted
@@ -30,9 +40,12 @@ users:
       literature.research_presentation: submitted
       computer_science.data_structures: submitted
   - name: Diego Ruiz
-    capabilities:
-      - student
+    role: student
     class: "2BHIT"
+    courses:
+      - mathematics
+      - physics
+      - computer_science
     task-status:
       mathematics.integrals: completed
       mathematics.derivatives: completed
@@ -40,11 +53,16 @@ users:
       computer_science.algorithms_quiz: submitted
       computer_science.capstone_project: submitted
   - name: Prof. Elaine Brooks
-    capabilities:
-      - teacher
+    role: teacher
+    courses:
+      - mathematics
+      - physics
+      - literature
+      - computer_science
   - name: Scheduler Admin
-    capabilities:
-      - teacher
-  - name: Slotmaster
-    capabilities:
-      - slotmaster
+    role: teacher
+    courses:
+      - mathematics
+      - physics
+      - literature
+      - computer_science

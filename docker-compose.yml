@@ -1,44 +1,58 @@
-# Docker Compose file for Moodle and MariaDB
-# for development purposes only. Do not use in production environments.
 services:
   mariadb:
-    image: bitnami/mariadb:latest
+    image: bitnamilegacy/mariadb:11.4.7-debian-12-r2
     environment:
-      - MARIADB_USER=bn_moodle
-      - MARIADB_PASSWORD=bn_moodle
-      - MARIADB_DATABASE=bitnami_moodle
-      - MARIADB_CHARACTER_SET=utf8mb4
-      - MARIADB_COLLATE=utf8mb4_unicode_ci
-      - ALLOW_EMPTY_PASSWORD=yes
+      MARIADB_USER: bn_moodle
+      MARIADB_PASSWORD: bn_moodle
+      MARIADB_DATABASE: bitnami_moodle
+      MARIADB_CHARACTER_SET: utf8mb4
+      MARIADB_COLLATE: utf8mb4_unicode_ci
+      ALLOW_EMPTY_PASSWORD: "yes"
     volumes:
-      - "./.dev/mariadb_data:/bitnami/mariadb"
+      - mariadb_data:/bitnami/mariadb
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 12
+
   moodle:
-    image: pallasys/eduplanner-demo:latest
     build:
       context: .
-      dockerfile: Dockerfile
+      additional_contexts:
+        lbplanner: ${LBPLANNER_CONTEXT:-../lb_planner_plugin}
+    pull_policy: build
     ports:
-      - "420:8080"
+      - "127.0.0.1:420:8080"
     environment:
-      - MOODLE_DATABASE_HOST=mariadb
-      - MOODLE_DATABASE_PORT_NUMBER=3306
-      - MOODLE_DATABASE_USER=bn_moodle
-      - MOODLE_DATABASE_PASSWORD=bn_moodle
-      - MOODLE_DATABASE_NAME=bitnami_moodle
-      - MOODLE_USERNAME=admin
-      - MOODLE_PASSWORD=test
-      - ALLOW_EMPTY_PASSWORD=yes
+      DEMO_BASE_URL: ${DEMO_BASE_URL:?Set DEMO_BASE_URL to http://localhost:420 or an external HTTPS origin}
+      MOODLE_DATABASE_HOST: mariadb
+      MOODLE_DATABASE_PORT_NUMBER: 3306
+      MOODLE_DATABASE_USER: bn_moodle
+      MOODLE_DATABASE_PASSWORD: bn_moodle
+      MOODLE_DATABASE_NAME: bitnami_moodle
+      MOODLE_USERNAME: admin
+      MOODLE_PASSWORD: ${MOODLE_ADMIN_PASSWORD:-test}
+      MOODLE_SITE_NAME: EduPlanner Demo
+      ALLOW_EMPTY_PASSWORD: "yes"
     depends_on:
       mariadb:
         condition: service_healthy
     volumes:
-      - "./.dev/moodle_data:/bitnami/moodle"
-      - "./.dev/moodledata_data:/bitnami/moodledata"
-      - "./src:/pallasys/cli/src"
-      - "./config:/pallasys/cli/config"
-      - "./schema:/pallasys/cli/schema"
+      - moodle_data:/bitnami/moodle
+      - moodledata_data:/bitnami/moodledata
+      - demo_state:/var/lib/eduplanner-demo
+      - ./config:/opt/eduplanner-demo/config
+      - ./schema:/opt/eduplanner-demo/schema
+    healthcheck:
+      test: ["CMD", "demo", "status", "--check"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 90s
+
+volumes:
+  mariadb_data:
+  moodle_data:
+  moodledata_data:
+  demo_state:

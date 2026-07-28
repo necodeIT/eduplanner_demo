@@ -1,6 +1,15 @@
 destroy.sh
 up.sh
+.env
+.git/
+.github/
+.vscode/
 __pycache__/
 dist/
+*.egg-info/
 .dev/
 Dockerfile
+.demo-state/
+.pytest_cache/
+tests/
+tests/__pycache__/

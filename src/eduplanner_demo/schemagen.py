@@ -1,312 +1,142 @@
-from .logger import Logger
-from .model import Capability, Clazz, Course, TaskStatus, User, Weekday
-from .config import Config
-from os.path import join as pathjoin
+from __future__ import annotations
 
-config = Config()
+import json
+import os
+import tempfile
+from pathlib import Path
 
-courses = config.read_courses_config()
-
-
-def schemagen(dp: str, courses: list[Course], users: list[User]) -> None:
-    """Generates schema files to a folder
-
-    :param list[Course] courses: existing courses to take into account
-    :param str dp: directory path to save schema files to
-    """
-    
-    Logger.info(f"generating schema files to {dp}...")
+from .model import ActivityType, Classification, DemoConfig, TaskStatus, UserRole
 
 
-    Logger.debug("Generating user schema...")
-
-    status_props = {
-        task.id: {
-            "type": "string",
-            "description": task.description.strip(),
-            "title": f"{task.name} ({course.name.strip()})",
-            "enum": [
-                TaskStatus.COMPLETED.value,
-                TaskStatus.SUBMITTED.value,
-            ],
-        }
-        for course in courses
-        for task in course.tasks
-    }
-
-    plan_props = {
-        task.id: {
-            "type": "object",
-            "description": task.description.strip(),
-            "title": f"{task.name} ({course.name.strip()})",
-            "properties": {
-                "start": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "description": "number of days from today when the task is planned to be started",
-                },
-                "end": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "description": "number of days from today when the task is planned to be due",
-                },
-            },
-        }
-        for course in courses
-        for task in course.tasks
-    }
-
-    USER_SCHEMA = {
+def course_schema() -> dict:
+    return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "EduPlanner Demo Users Config",
+        "title": "EduPlanner Demo Courses",
         "type": "object",
-        "required": ["users", "password"],
+        "required": ["courses"],
         "properties": {
-            "password": {
-                "type": "string",
-                "description": "Default password for created users.",
-            },
-            "users": {
-                "description": "Moodle Users to create.",
+            "courses": {
                 "type": "array",
+                "minItems": 1,
                 "items": {
-                    "anyOf": [
-                        {
-                            "type": "object",
-                            "required": [
-                                "name",
-                                "capabilities",
-                                "class",
-                                "task-status",
-                            ],
-                            "properties": {
-                                "task-status": {
-                                    "type": "object",
-                                    "description": "Map<String, submitted|done>",
-                                    "properties": status_props,
-                                    "additionalProperties": False,
-                                },
-                                "class": {
-                                    "type": "string",
-                                    "enum": [c.value for c in Clazz],
-                                },
-                                "name": {"type": "string"},
-                                "submitted_tasks": {
-                                    "type": "array",
-                                    "items": {"type": "string"},
-                                },
-                                "capabilities": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string",
-                                        "enum": [c.value for c in Capability],
+                    "type": "object",
+                    "required": ["name", "tasks"],
+                    "additionalProperties": False,
+                    "properties": {
+                        "name": {"type": "string", "minLength": 1},
+                        "tasks": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": ["name", "description", "due", "type"],
+                                "additionalProperties": False,
+                                "properties": {
+                                    "name": {"type": "string", "minLength": 1},
+                                    "description": {"type": "string"},
+                                    "due": {"type": "integer", "minimum": 0},
+                                    "type": {"enum": [value.value for value in ActivityType]},
+                                    "classification": {
+                                        "type": ["string", "null"],
+                                        "enum": [value.value for value in Classification] + [None],
                                     },
                                 },
                             },
-                            "additionalProperties": False,
                         },
-                        {
-                            "type": "object",
-                            "required": ["name", "capabilities"],
-                            "properties": {
-                                "class": {
-                                    "type": "string",
-                                    "enum": [c.value for c in Clazz],
-                                },
-                                "name": {"type": "string"},
-                                "capabilities": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "string",
-                                        "enum": [
-                                            c.value
-                                            for c in Capability
-                                            if c != Capability.STUDENT
-                                        ],
-                                    },
-                                },
-                            },
-                            "additionalProperties": False,
-                        },
-                    ]
+                    },
                 },
             }
         },
         "additionalProperties": False,
     }
 
-    fn = "users.yml.schema.json"
-    fp = pathjoin(dp, fn)
 
-    with open(fp, "w") as f:
-        import json
-
-        json.dump(USER_SCHEMA, f, indent=4)
-        
-    Logger.success(fn)
-
-    Logger.debug("Generating slots schema...")
-
-    SLOTS_SCHEMA = {
+def user_schema(config: DemoConfig) -> dict:
+    course_ids = [course.id for course in config.courses]
+    task_properties = {
+        activity.id: {
+            "type": "string",
+            "enum": [value.value for value in TaskStatus],
+            "title": f"{activity.name} ({activity.course_id})",
+        }
+        for activity in config.activities
+    }
+    return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "EduPlanner Demo Slots Config",
+        "title": "EduPlanner Demo Users",
         "type": "object",
-        "required": ["slots"],
+        "required": ["password", "users"],
+        "additionalProperties": False,
         "properties": {
-            "slots": {
+            "password": {"type": "string", "minLength": 1},
+            "users": {
                 "type": "array",
+                "minItems": 1,
                 "items": {
                     "type": "object",
-                    "required": [
-                        "weekday",
-                        "start",
-                        "duration",
-                        "supervisors",
-                        "room",
-                        "capacity",
-                        "mappings",
-                        "disambiguate",
+                    "required": ["name", "role", "courses"],
+                    "additionalProperties": False,
+                    "allOf": [
+                        {
+                            "if": {"properties": {"role": {"const": "student"}}},
+                            "then": {
+                                "required": ["class"],
+                                "properties": {"class": {"type": "string", "minLength": 1}},
+                            },
+                        },
+                        {
+                            "if": {"properties": {"role": {"const": "teacher"}}},
+                            "then": {"properties": {"task-status": {"maxProperties": 0}}},
+                        },
                     ],
                     "properties": {
-                        "disambiguate": {"type": "integer", "minimum": 0},
-                        "weekday": {
-                            "enum": [
-                                w.name.lower() for w in Weekday
-                            ]
-                        },
-                        "start_hour": {"type": "integer", "minimum": 1, "maximum": 16},
-                        "duration": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 16,
-                        },
-                        "supervisors": {
+                        "name": {"type": "string", "minLength": 1},
+                        "role": {"enum": [value.value for value in UserRole]},
+                        "class": {"type": ["string", "null"]},
+                        "courses": {
                             "type": "array",
-                            "items": {
-                                "type": "string",
-                                "enum": [
-                                    u.id
-                                    for u in users
-                                    if Capability.TEACHER in u.capabilities
-                                ],
-                            },
+                            "minItems": 1,
+                            "uniqueItems": True,
+                            "items": {"type": "string", "enum": course_ids},
                         },
-                        "room": {"type": "string", "maxLength": 7},
-                        "capacity": {"type": "integer", "minimum": 1},
-                        "mappings": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "required": ["class", "course"],
-                                "properties": {
-                                    "class": {
-                                        "type": "string",
-                                        "enum": [c.value for c in Clazz],
-                                    },
-                                    "course": {
-                                        "type": "string",
-                                        "enum": [c.id for c in courses],
-                                    },
-                                },
-                            },
+                        "task-status": {
+                            "type": "object",
+                            "properties": task_properties,
+                            "additionalProperties": False,
                         },
                     },
                 },
-                "additionalProperties": False,
-            }
-        },
-    }
-    
-    fn = "slots.yml.schema.json"
-    fp = pathjoin(dp, fn)
-    with open(fp, "w") as f:
-        import json
-
-        json.dump(SLOTS_SCHEMA, f, indent=4)
-
-    Logger.success(fn)
-
-    Logger.debug("Generating plans schema...")
-
-    PLANS_SCHEMA = {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "EduPlanner Demo Plans Config",
-        "type": "object",
-        "required": ["plans"],
-        "properties": {
-            "plans": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "required": ["name", "deadlines", "owner"],
-                    "properties": {
-                        "name": {"type": "string"},
-                        "owner": {
-                            "description": "The owner of the plan.",
-                            "type": "string",
-                            "enum": [
-                                user.id
-                                for user in users
-                                if Capability.STUDENT in user.capabilities
-                            ],
-                        },
-                        "members": {
-                            "type": "array",
-                            "description": "Users the plan is shared with (write access)",
-                            "items": {
-                                "type": "string",
-                                "enum": [
-                                    user.id
-                                    for user in users
-                                    if Capability.STUDENT in user.capabilities
-                                ],
-                            },
-                        },
-                        "deadlines": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "required": ["task", "deadlinestart"],
-                                "properties": {
-                                    "task": {
-                                        "type": "string",
-                                        "enum": [
-                                            task.id
-                                            for course in courses
-                                            for task in course.tasks
-                                        ],
-                                    },
-                                    "deadlinestart": {
-                                        "type": "integer",
-                                        "description": "Days after now when the deadline starts.",
-                                        "minimum": 0,
-                                    },
-                                    "duration": {
-                                        "type": "integer",
-                                        "description": "Days after deadline start when the deadline ends.",
-                                        "minimum": 0,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            }
+            },
         },
     }
 
 
-
-
-    fn = "plans.yml.schema.json"
-    fp = pathjoin(dp, fn)
-    with open(fp, "w") as f:
-        import json
-
-        json.dump(PLANS_SCHEMA, f, indent=4)
-
-    Logger.success(fn)
-  
-
-  
-    
+def generate_schemas(output: str | Path, config: DemoConfig) -> list[Path]:
+    directory = Path(output)
+    directory.mkdir(parents=True, exist_ok=True)
+    generated = []
+    for name, schema in (
+        ("courses.yml.schema.json", course_schema()),
+        ("users.yml.schema.json", user_schema(config)),
+    ):
+        path = directory / name
+        payload = json.dumps(schema, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+        if path.exists() and path.read_text(encoding="utf-8") == payload:
+            generated.append(path)
+            continue
+        stat = path.stat() if path.exists() else None
+        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{name}.", dir=directory)
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            if stat:
+                os.chmod(temporary, stat.st_mode)
+                if os.geteuid() == 0:
+                    os.chown(temporary, stat.st_uid, stat.st_gid)
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        generated.append(path)
+    return generated

@@ -1,9 +1,0 @@
-plans:
-  - name: Test
-    owner: brian_patel
-    members:
-      - diego_ruiz
-      - alice_johnson
-    deadlines:
-      - task: mathematics.derivatives
-        deadlinestart: 2

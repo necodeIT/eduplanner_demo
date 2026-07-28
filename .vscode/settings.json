@@ -5,20 +5,6 @@
         ],
         "schema/courses.yml.schema.json": [
             "config/courses.yml"
-        ],
-        "schema/slots.yml.schema.json": [
-            "config/slots.yml"
-        ],
-        "schema/plans.yml.schema.json": [
-            "config/plans.yml"
-        ]
-    },
-    "emeraldwalk.runonsave": {
-        "commands": [
-            {
-                "match": "courses.yml$",
-                "cmd": "python3 -m hatch run python3 -m eduplanner_demo schemagen -o ./schema/"
-            }
         ]
     },
     "[python]": {

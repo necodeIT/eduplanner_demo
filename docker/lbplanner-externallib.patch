@@ -1,0 +1,41 @@
+diff --git a/classes/sync/provider.php b/classes/sync/provider.php
+--- a/classes/sync/provider.php
++++ b/classes/sync/provider.php
+@@ -33,8 +33,9 @@ final class provider {
+      * @return array Contract-v1 identity.
+      */
+     public static function get_identity(): array {
+-        global $USER;
++        global $CFG, $USER;
+ 
++        require_once($CFG->libdir . '/externallib.php');
+         $userid = self::current_user_id();
+         $usercontext = \context_user::instance($userid);
+         sync_service::validate_resource_context($usercontext);
+@@ -87,6 +88,7 @@ final class provider {
+     private static function load_courses(): array {
+         global $CFG;
+ 
++        require_once($CFG->libdir . '/externallib.php');
+         require_once($CFG->dirroot . '/group/lib.php');
+ 
+         $userid = self::current_user_id();
+diff --git a/classes/sync/contract.php b/classes/sync/contract.php
+--- a/classes/sync/contract.php
++++ b/classes/sync/contract.php
+@@ -55,12 +55,16 @@ final class contract {
+         global $CFG;
+ 
+         $url = rtrim((string) $CFG->wwwroot, '/');
+         $parts = parse_url($url);
++        $scheme = is_array($parts) ? strtolower($parts['scheme'] ?? '') : '';
++        $host = is_array($parts) ? strtolower($parts['host'] ?? '') : '';
++        $secureorigin = $scheme === 'https';
++        $loopbackorigin = $scheme === 'http' && in_array($host, ['localhost', '127.0.0.1', '::1'], true);
+         if (
+             filter_var($url, FILTER_VALIDATE_URL) === false || $parts === false ||
+-            strtolower($parts['scheme'] ?? '') !== 'https' || empty($parts['host']) ||
++            (!$secureorigin && !$loopbackorigin) || empty($host) ||
+             isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])
+         ) {
+             throw new \moodle_exception('err_sync_invalidsiteurl', 'local_lbplanner');
