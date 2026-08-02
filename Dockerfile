@@ -1,10 +1,16 @@
 # syntax=docker/dockerfile:1.7
 
 FROM composer:2 AS plugin-builder
+ARG LBPLANNER_REF=main
 WORKDIR /work
 COPY --from=lbplanner /composer.json ./
 COPY --from=lbplanner /lbplanner ./lbplanner
-RUN composer update --no-dev --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --optimize-autoloader
+RUN test -f lbplanner/classes/sync/provider.php && \
+    test -f lbplanner/classes/sync/contract.php || \
+    (printf 'ERROR: LBPLANNER_REF=%s does not contain the LB Planner 2.0 sync contract.\n' "$LBPLANNER_REF" >&2; \
+     printf 'Choose a 2.0 release tag, branch, or full commit SHA with LBPLANNER_REF.\n' >&2; \
+     exit 1) && \
+    composer update --no-dev --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --optimize-autoloader
 
 FROM scratch AS modcustomfields
 ADD --checksum=sha256:873926a08589713a7d7f79629bb7e12c1b05ff429040188e1240878fe8d6aaef \
@@ -12,6 +18,9 @@ ADD --checksum=sha256:873926a08589713a7d7f79629bb7e12c1b05ff429040188e1240878fe8
     /modcustomfields.tar.gz
 
 FROM bitnamilegacy/moodle:4.4.4-debian-12-r4@sha256:1e8ba5393f4cfec9e1151ca31b8f38600e4566e189cb754903667bca19e10b0b
+
+ARG LBPLANNER_REF=main
+LABEL org.opencontainers.image.lbplanner-ref=$LBPLANNER_REF
 
 USER root
 RUN install_packages gosu patch python3 python3-pip rsync tar
@@ -47,6 +56,7 @@ ENV DEMO_CONFIG_DIR=/opt/eduplanner-demo/config \
     DEMO_STATE_DIR=/var/lib/eduplanner-demo \
     DEMO_AGENT_SOCKET=/run/eduplanner-demo/agent.sock \
     DEMO_MOODLE_DIR=/bitnami/moodle \
+    DEMO_LBPLANNER_REF=$LBPLANNER_REF \
     PYTHONUNBUFFERED=1
 
 WORKDIR /

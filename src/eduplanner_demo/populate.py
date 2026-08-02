@@ -108,6 +108,8 @@ def config_hash(config: Config) -> str:
     digest.update(f"eduplanner-demo:{__version__}:{POPULATOR_VERSION}\0".encode())
     digest.update(os.getenv("DEMO_BASE_URL", "").encode())
     digest.update(b"\0")
+    digest.update(os.getenv("DEMO_LBPLANNER_REF", "unknown").encode())
+    digest.update(b"\0")
     for name in ("courses", "users"):
         digest.update(name.encode())
         digest.update(b"\0")
@@ -139,6 +141,7 @@ def apply(
             state.write({"state": "applying", "hash": requested_hash})
             with Logger.stage("Configure Moodle and LB Planner Sync API"):
                 environment = adapter.configure(external_url)
+                environment["lbPlannerRef"] = os.getenv("DEMO_LBPLANNER_REF", "unknown")
                 if Logger.verbose:
                     Logger.debug(f"Moodle diagnostics: {adapter.diagnostics()}")
             adapter.enable_maintenance()
@@ -222,6 +225,7 @@ def _local_request(path: str, data: dict[str, str]) -> Any:
 def doctor(config: Config, adapter: MoodleCLI) -> dict[str, Any]:
     parsed = config.read()
     environment = adapter.diagnostics()
+    environment["lbPlannerRef"] = os.getenv("DEMO_LBPLANNER_REF", "unknown")
     proxy_mode = urlparse(base_url()).scheme == "https"
     expected = {
         "pluginRelease": "2.0.0",

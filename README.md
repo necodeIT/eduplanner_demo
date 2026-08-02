@@ -15,7 +15,7 @@ docker compose up --build -d
 
 Open [http://localhost:420](http://localhost:420). Local mode accepts only loopback HTTP origins (`localhost` or `127.0.0.1`) and automatically disables Moodle's reverse-proxy and SSL-proxy flags. Switching an existing named-volume installation between local and proxy modes rewrites its persisted canonical origin on startup; deleting volumes is not required.
 
-Compose always builds the demo image from this checkout and the adjacent LB Planner build context. It does not pull or push an `eduplanner-demo` application image. Docker still downloads the pinned Moodle, MariaDB, Composer, and Dockerfile frontend base images when they are not already cached locally.
+Compose always builds the `eduplanner_demo-moodle` application image locally. It does not pull or push that application image. During the build, BuildKit fetches LB Planner directly from GitHub and downloads the pinned Moodle, MariaDB, Composer, and Dockerfile frontend base images when they are not already cached locally.
 
 For HTTPS reverse-proxy testing, set `DEMO_BASE_URL` to the public HTTPS origin. The proxy should forward it to `http://127.0.0.1:420`, set the upstream `Host` to an internal name (for example `127.0.0.1:420`), and set `X-Forwarded-Proto: https`. Moodle 4.4 rejects the public host on the upstream request when reverse-proxy mode is enabled. TLS terminates at the proxy, and Moodle generates canonical URLs from `DEMO_BASE_URL`.
 
@@ -95,13 +95,22 @@ Site administrators can open **Site administration → Plugins → Local plugins
 
 ## Plugin source and image builds
 
-Local builds use `../lb_planner_plugin` as a named Docker build context. Override it when necessary:
+Builds fetch LB Planner directly from `necodeIT/lb_planner_plugin` on GitHub. No adjacent plugin checkout is required. The default ref is `main`; use `LBPLANNER_REF` to select a release tag, branch, or full 40-character commit SHA:
 
 ```shell
-LBPLANNER_CONTEXT=/absolute/path/to/lb_planner_plugin docker compose build moodle
+LBPLANNER_REF=v2.0.0 docker compose build moodle
+LBPLANNER_REF=25eae44bc48b628798f4028f68a4f972b578356e docker compose build moodle
 ```
 
-The resulting image contains that source and its production Composer dependencies, so PHP changes require an image rebuild. CI checks out the plugin repository and provides the same named context.
+You can also put the selection in `.env`:
+
+```dotenv
+LBPLANNER_REF=25eae44bc48b628798f4028f68a4f972b578356e
+```
+
+The resulting image contains the selected source and its production Composer dependencies. Changing `LBPLANNER_REF`, or rebuilding after the selected branch advances, incorporates the new plugin source. CI uses the same remote Git context and accepts an optional `lbplanner_ref` input when started manually.
+
+The selected ref must contain the LB Planner 2.0 sync contract. The build checks this before installing Composer dependencies and reports an actionable error when an older ref is selected.
 
 ## Development checks
 

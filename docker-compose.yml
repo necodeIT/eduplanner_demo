@@ -19,8 +19,10 @@ services:
   moodle:
     build:
       context: .
+      args:
+        LBPLANNER_REF: ${LBPLANNER_REF:-main}
       additional_contexts:
-        lbplanner: ${LBPLANNER_CONTEXT:-../lb_planner_plugin}
+        lbplanner: "https://github.com/necodeIT/lb_planner_plugin.git#${LBPLANNER_REF:-main}"
     pull_policy: build
     ports:
       - "127.0.0.1:420:8080"

@@ -118,10 +118,16 @@ def test_schemas_are_deterministic_and_cross_reference_tasks(tmp_path: Path) -> 
     assert set(task_properties) == {"computer_science.final_quiz", "computer_science.project"}
 
 
-def test_hash_changes_with_config_and_redaction_hides_secrets(tmp_path: Path) -> None:
+def test_hash_changes_with_config_plugin_ref_and_redaction_hides_secrets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     courses, users = valid_data()
     config = write_config(tmp_path, courses, users)
+    monkeypatch.setenv("DEMO_LBPLANNER_REF", "2.0.0")
     before = config_hash(config)
+    monkeypatch.setenv("DEMO_LBPLANNER_REF", "0123456789abcdef")
+    assert config_hash(config) != before
+    monkeypatch.setenv("DEMO_LBPLANNER_REF", "2.0.0")
     users["password"] = "changed"
     config.save(courses, users)
     assert config_hash(config) != before

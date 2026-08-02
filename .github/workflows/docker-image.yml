@@ -4,6 +4,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      lbplanner_ref:
+        description: LB Planner release tag, branch, or full commit SHA
+        required: false
+        default: main
 
 jobs:
     build:
@@ -15,12 +20,6 @@ jobs:
 
           - name: Checkout demo
             uses: actions/checkout@v4
-
-          - name: Checkout LB Planner plugin
-            uses: actions/checkout@v4
-            with:
-              repository: necodeIT/lb_planner_plugin
-              path: lb_planner_plugin
 
           - name: 🐳 Login to GitHub Container Registry
             uses: docker/login-action@v3.3.0
@@ -34,8 +33,10 @@ jobs:
             with:
               context: .
               file: ./Dockerfile
+              build-args: |
+                LBPLANNER_REF=${{ inputs.lbplanner_ref || 'main' }}
               build-contexts: |
-                lbplanner=./lb_planner_plugin
+                lbplanner=https://github.com/necodeIT/lb_planner_plugin.git#${{ inputs.lbplanner_ref || 'main' }}
               platforms: linux/amd64
               push: true
               tags: ghcr.io/necodeit/eduplanner_demo:latest
