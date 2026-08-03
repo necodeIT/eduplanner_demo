@@ -18,10 +18,12 @@ from . import __version__
 from .adapter_moodlecli import MoodleCLI
 from .config import Config, ConfigError
 from .logger import Logger
+from .model import DemoConfig
 from .schemagen import generate_schemas
 
 
-POPULATOR_VERSION = "3"
+POPULATOR_VERSION = "4"
+INTEGRATION_MANIFEST = "integration-manifest.json"
 
 
 def base_url() -> str:
@@ -131,7 +133,17 @@ def apply(
         requested_hash: str | None = None
         try:
             requested_hash = config_hash(config)
-            if not force and previous.get("state") == "ready" and previous.get("hash") == requested_hash:
+            manifest_path = state.directory / INTEGRATION_MANIFEST
+            manifest_ready = (
+                manifest_path.is_file()
+                and manifest_path.stat().st_mode & 0o777 == 0o600
+            )
+            if (
+                not force
+                and previous.get("state") == "ready"
+                and previous.get("hash") == requested_hash
+                and manifest_ready
+            ):
                 Logger.info(f"Configuration unchanged ({requested_hash[:12]}); skipping full reset")
                 return previous
             with Logger.stage("Validate configuration and regenerate schemas"):
@@ -139,6 +151,7 @@ def apply(
                 generate_schemas(schema_dir, parsed)
                 external_url = base_url()
             state.write({"state": "applying", "hash": requested_hash})
+            (state.directory / INTEGRATION_MANIFEST).unlink(missing_ok=True)
             with Logger.stage("Configure Moodle and LB Planner Sync API"):
                 environment = adapter.configure(external_url)
                 environment["lbPlannerRef"] = os.getenv("DEMO_LBPLANNER_REF", "unknown")
@@ -162,6 +175,8 @@ def apply(
                 adapter.purge_caches()
                 representative = next(iter(user_ids.values()))
                 contract = adapter.internal_doctor(representative)
+            with Logger.stage("Create private EduPlanner integration manifest"):
+                write_integration_manifest(parsed, state, requested_hash)
             result = {
                 "state": "ready",
                 "hash": requested_hash,
@@ -193,6 +208,62 @@ def apply(
                 }
             )
             raise
+
+
+def write_integration_manifest(
+    config: DemoConfig,
+    state: StateStore,
+    configuration_hash: str,
+) -> Path:
+    """Atomically write the private, token-bearing EduPlanner handoff file.
+
+    The manifest lives only in the container state volume. Its contents are
+    consumed by the Serverpod provisioner and must never be printed or added to
+    normal status output.
+    """
+    users: list[dict[str, Any]] = []
+    for user in config.users:
+        token_result = _local_request(
+            "/login/token.php",
+            {
+                "username": user.id,
+                "password": config.password,
+                "service": "lb_planner_sync_api",
+            },
+        )
+        token = token_result.get("token") if isinstance(token_result, dict) else None
+        if not isinstance(token, str) or not token:
+            raise RuntimeError(f"Moodle did not issue a sync token for {user.id}")
+        users.append(
+            {
+                "key": user.id,
+                "name": user.name,
+                "email": f"{user.id}@example.invalid",
+                "role": user.role.value,
+                "class": user.clazz,
+                "token": token,
+            }
+        )
+    payload = {
+        "schemaVersion": 1,
+        "configurationHash": configuration_hash,
+        "siteUrl": base_url(),
+        "users": users,
+    }
+    descriptor, name = tempfile.mkstemp(prefix=".integration-manifest.", dir=state.directory)
+    temporary = Path(name)
+    destination = state.directory / INTEGRATION_MANIFEST
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, ensure_ascii=False, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, destination)
+        return destination
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _local_request(path: str, data: dict[str, str]) -> Any:

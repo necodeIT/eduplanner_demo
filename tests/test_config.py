@@ -10,7 +10,7 @@ import yaml
 from eduplanner_demo.config import Config, ConfigError
 from eduplanner_demo.adapter_moodlecli import MoodleCLI
 from eduplanner_demo.logger import redact
-from eduplanner_demo.populate import base_url, config_hash
+from eduplanner_demo.populate import StateStore, base_url, config_hash, write_integration_manifest
 from eduplanner_demo.schemagen import generate_schemas
 
 
@@ -153,6 +153,51 @@ def test_save_preserves_file_modes(tmp_path: Path) -> None:
     config.save(courses, users)
     assert config.path("courses").stat().st_mode & 0o777 == 0o640
     assert config.path("users").stat().st_mode & 0o777 == 0o600
+
+
+def test_private_integration_manifest_contains_every_configured_user(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    courses, users = valid_data()
+    parsed = Config.from_data(courses, users)
+    state = StateStore(tmp_path / "state")
+    monkeypatch.setenv("DEMO_BASE_URL", "http://localhost:420")
+
+    def token_request(path: str, data: dict[str, str]) -> dict[str, str]:
+        assert path == "/login/token.php"
+        return {"token": f"private-{data['username']}"}
+
+    monkeypatch.setattr("eduplanner_demo.populate._local_request", token_request)
+    manifest_path = write_integration_manifest(parsed, state, "configuration-hash")
+    manifest = json.loads(manifest_path.read_text())
+
+    assert manifest_path.stat().st_mode & 0o777 == 0o600
+    assert manifest["schemaVersion"] == 1
+    assert manifest["configurationHash"] == "configuration-hash"
+    assert [row["key"] for row in manifest["users"]] == [
+        "alice_student",
+        "taylor_teacher",
+    ]
+    assert manifest["users"][0]["email"] == "alice_student@example.invalid"
+    assert manifest["users"][0]["token"] == "private-alice_student"
+
+    first_bytes = manifest_path.read_bytes()
+    write_integration_manifest(parsed, state, "configuration-hash")
+    assert manifest_path.read_bytes() == first_bytes
+
+    def rotated_token_request(path: str, data: dict[str, str]) -> dict[str, str]:
+        return {"token": f"rotated-{data['username']}"}
+
+    monkeypatch.setattr(
+        "eduplanner_demo.populate._local_request",
+        rotated_token_request,
+    )
+    write_integration_manifest(parsed, state, "configuration-hash")
+    rotated = json.loads(manifest_path.read_text())
+    assert rotated["users"][0]["token"] == "rotated-alice_student"
+    assert [{**row, "token": None} for row in rotated["users"]] == [
+        {**row, "token": None} for row in manifest["users"]
+    ]
 
 
 def test_repository_sample_has_migrated_legacy_exams_and_users() -> None:

@@ -2,7 +2,11 @@
 
 A disposable Moodle 4.4 environment for exercising the LB Planner 2.0 read-only sync API. It creates native Moodle courses, groups, assignments, quizzes, submissions, attempts, completion state, and activity classifications, then verifies the four token-scoped sync resources.
 
-> **Destructive demo only:** every configuration apply deletes every Moodle course and every non-admin user. The image is based on the archived Bitnami 4.4 image and must not be used as production infrastructure or exposed without access controls.
+> **Destructive demo only:** every configuration apply deletes every Moodle
+> course and every non-admin user. The image is based on the archived Bitnami
+> 4.4 image and must never contain production data or serve as production
+> infrastructure. A public customer demo must remain disposable and sit behind
+> the documented TLS ingress and rate limits.
 
 ## Start locally
 
@@ -26,6 +30,14 @@ On every image start the container automatically:
 3. validates YAML and regenerates JSON schemas;
 4. populates Moodle when the config/populator hash changed; and
 5. watches both config files and reapplies valid changes once they settle.
+
+After every successful population it also writes the private versioned
+integration manifest to
+`/var/lib/eduplanner-demo/integration-manifest.json`. The atomic file is mode
+`0600` and includes all configured non-admin users plus their personal LB
+Planner tokens for the EduPlanner server provisioner. It must be mounted only
+through a private state volume: no command prints it, no web route serves it,
+and it must never be copied into an image or logs.
 
 No Moodle administration clicks, Hatch shell, manual plugin copy, filesystem `chmod`, or container-user switch is required.
 
