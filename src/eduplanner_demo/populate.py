@@ -6,12 +6,13 @@ import json
 import os
 import tempfile
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
-from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from . import __version__
@@ -21,9 +22,11 @@ from .logger import Logger
 from .model import DemoConfig
 from .schemagen import generate_schemas
 
-
-POPULATOR_VERSION = "4"
+POPULATOR_VERSION = "5"
 INTEGRATION_MANIFEST = "integration-manifest.json"
+INTERNAL_HTTP_ATTEMPTS = 6
+INTERNAL_HTTP_TIMEOUT_SECONDS = 15
+TRANSIENT_HTTP_STATUSES = {408, 425, 429, 500, 502, 503, 504}
 
 
 def base_url() -> str:
@@ -176,7 +179,13 @@ def apply(
                 representative = next(iter(user_ids.values()))
                 contract = adapter.internal_doctor(representative)
             with Logger.stage("Create private EduPlanner integration manifest"):
-                write_integration_manifest(parsed, state, requested_hash)
+                personal_tokens = adapter.create_personal_tokens(user_ids)
+                write_integration_manifest(
+                    parsed,
+                    state,
+                    requested_hash,
+                    personal_tokens,
+                )
             result = {
                 "state": "ready",
                 "hash": requested_hash,
@@ -214,6 +223,7 @@ def write_integration_manifest(
     config: DemoConfig,
     state: StateStore,
     configuration_hash: str,
+    personal_tokens: dict[str, str],
 ) -> Path:
     """Atomically write the private, token-bearing EduPlanner handoff file.
 
@@ -223,15 +233,7 @@ def write_integration_manifest(
     """
     users: list[dict[str, Any]] = []
     for user in config.users:
-        token_result = _local_request(
-            "/login/token.php",
-            {
-                "username": user.id,
-                "password": config.password,
-                "service": "lb_planner_sync_api",
-            },
-        )
-        token = token_result.get("token") if isinstance(token_result, dict) else None
+        token = personal_tokens.get(user.id)
         if not isinstance(token, str) or not token:
             raise RuntimeError(f"Moodle did not issue a sync token for {user.id}")
         users.append(
@@ -267,10 +269,17 @@ def write_integration_manifest(
 
 
 def _local_request(path: str, data: dict[str, str]) -> Any:
+    """POST to Moodle's container-local HTTP listener and decode JSON.
+
+    Population uses the internal listener so it does not depend on public DNS
+    or TLS ingress. Transient startup and overload responses are retried. Error
+    bodies and form fields are deliberately omitted from exceptions and logs
+    because they can contain personal web-service tokens or passwords.
+    """
     parsed = urlparse(base_url())
     port = int(os.getenv("DEMO_INTERNAL_HTTP_PORT", "8080"))
     request_host = parsed.netloc if parsed.scheme == "http" else f"127.0.0.1:{port}"
-    for attempt in range(1, 4):
+    for attempt in range(1, INTERNAL_HTTP_ATTEMPTS + 1):
         request = Request(
             f"http://127.0.0.1:{port}{path}",
             data=urlencode(data).encode(),
@@ -283,13 +292,35 @@ def _local_request(path: str, data: dict[str, str]) -> Any:
             method="POST",
         )
         try:
-            with urlopen(request, timeout=30) as response:
+            with urlopen(
+                request, timeout=INTERNAL_HTTP_TIMEOUT_SECONDS
+            ) as response:
                 return json.loads(response.read())
-        except (URLError, TimeoutError, json.JSONDecodeError):
-            if attempt == 3:
-                raise
-            Logger.warning(f"Moodle HTTP request failed; retrying {path} ({attempt}/3)")
-            time.sleep(attempt)
+        except HTTPError as error:
+            status = error.code
+            error.close()
+            if status not in TRANSIENT_HTTP_STATUSES:
+                raise RuntimeError(
+                    f"Moodle internal request {path} failed with HTTP {status}; "
+                    "inspect the Moodle container logs"
+                ) from None
+            failure = f"HTTP {status}"
+        except (URLError, TimeoutError):
+            failure = "connection failure"
+        except json.JSONDecodeError:
+            failure = "invalid JSON response"
+
+        if attempt == INTERNAL_HTTP_ATTEMPTS:
+            raise RuntimeError(
+                f"Moodle internal request {path} failed after "
+                f"{INTERNAL_HTTP_ATTEMPTS} attempts ({failure}); "
+                "inspect the Moodle container logs"
+            ) from None
+        Logger.warning(
+            f"Moodle internal request failed; retrying {path} "
+            f"({attempt}/{INTERNAL_HTTP_ATTEMPTS}, {failure})"
+        )
+        time.sleep(min(2 ** (attempt - 1), 8))
     raise AssertionError("unreachable")
 
 
@@ -331,7 +362,9 @@ def doctor(config: Config, adapter: MoodleCLI) -> dict[str, Any]:
         },
     )
     if "token" not in token_result:
-        raise RuntimeError(f"Moodle did not issue a sync token: {token_result}")
+        raise RuntimeError(
+            "Moodle did not issue a sync token for the representative user"
+        )
     resources: dict[str, Any] = {}
     for resource in ("identity", "courses", "assignments", "quizzes"):
         function = f"local_lbplanner_sync_get_{resource}"
@@ -344,11 +377,16 @@ def doctor(config: Config, adapter: MoodleCLI) -> dict[str, Any]:
             },
         )
         if isinstance(result, dict) and result.get("exception"):
-            raise RuntimeError(f"{function} failed: {result.get('message', result)}")
+            raise RuntimeError(f"{function} returned a Moodle exception")
         resources[resource] = result
     identity = resources["identity"]
-    if identity.get("contractVersion") != 1 or identity.get("pluginRelease") != "2.0.0":
-        raise RuntimeError(f"Unexpected LB Planner identity: {identity}")
+    if (
+        identity.get("contractVersion") != 1
+        or identity.get("pluginRelease") != "2.0.0"
+    ):
+        raise RuntimeError(
+            "LB Planner returned an unexpected contract version or plugin release"
+        )
     if identity.get("siteUrl") != base_url():
         raise RuntimeError(
             f"Plugin siteUrl {identity.get('siteUrl')!r} does not match DEMO_BASE_URL {base_url()!r}"

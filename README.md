@@ -47,6 +47,82 @@ To remove the complete disposable environment:
 docker compose down -v
 ```
 
+## Environment variables
+
+Copy `.env.example` to `.env` for standalone use. The file is local operator
+configuration and must not be committed when it contains a real administrator
+password.
+
+| Variable | Required | Meaning |
+| --- | --- | --- |
+| `DEMO_BASE_URL` | Yes | Canonical public Moodle origin. Use exactly `http://localhost:420` (or `127.0.0.1`) locally, or an HTTPS origin without a path, query, fragment, credentials, or trailing slash. |
+| `MOODLE_ADMIN_PASSWORD` | Shared environments | Moodle administrator password. Standalone local Compose defaults to `test`; never rely on that default for a customer demo. |
+| `LBPLANNER_REF` | Image releases | LB Planner tag, branch, or commit selected at build time. Hosted images must use a full 40-character commit SHA; standalone local builds default to `main`. |
+
+The image also defines implementation variables that Compose already wires and
+operators should not normally override:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `DEMO_INTERNAL_HTTP_PORT` | `8080` | Container-local Apache port used by the post-start `demo doctor` REST checks. This is not the published host port `420`. |
+| `DEMO_CONFIG_DIR` | `/opt/eduplanner-demo/config` | Directory containing `courses.yml` and `users.yml`. |
+| `DEMO_SCHEMA_DIR` | `/opt/eduplanner-demo/schema` | Generated JSON-schema directory. |
+| `DEMO_STATE_DIR` | `/var/lib/eduplanner-demo` | Private status, lock, and integration-manifest volume. |
+| `DEMO_MOODLE_DIR` | `/bitnami/moodle` | Moodle installation directory. |
+| `DEMO_MOODLE_USER` | `daemon` | Account used for Moodle CLI operations. |
+| `DEMO_AGENT_SOCKET` | `/run/eduplanner-demo/agent.sock` | Private configuration-editor Unix socket. |
+| `DEMO_LBPLANNER_REF` | baked into image | Selected plugin revision recorded in diagnostics and the deterministic population hash. |
+
+MariaDB and `MOODLE_*` installation variables in `docker-compose.yml` are
+Bitnami container inputs. In the combined EduPlanner stack they are supplied by
+`tool/eduplanner`; do not add them separately to the server's `.env.local`.
+
+## HTTP diagnostics
+
+Initial population runs before Apache starts. Integration-manifest tokens are
+therefore created through Moodle's CLI bootstrap using the same core token
+utility as `login/token.php`; population does not depend on HTTP, public DNS, or
+TLS ingress. If startup logs show `/login/token.php` retries while creating the
+manifest, the container is running an older image and must be rebuilt.
+
+The operator-run `demo doctor` command does exercise REST through
+`127.0.0.1:8080` inside the running Moodle container; it does not call the
+public `:420` mapping. Connection failures, malformed responses, HTTP `408`,
+`425`, `429`, and common `5xx` responses are retried six times with bounded
+backoff. Permanent `4xx` responses fail immediately. Form fields and response
+bodies are never logged, because they can contain passwords or personal
+web-service tokens.
+
+Use these redacted diagnostics first:
+
+```shell
+docker compose ps
+docker compose logs --tail=200 moodle mariadb
+docker compose exec moodle demo status
+docker compose exec moodle demo doctor
+```
+
+- Repeated `connection failure` or `HTTP 502/503` usually means Apache/PHP or
+  MariaDB did not become stable. Check the first fatal error in the Moodle and
+  MariaDB logs, then restart the Moodle service.
+- An Apache access-log line such as `"-" 408 -` is not a population request.
+  It means a port probe opened a TCP connection without sending HTTP. If
+  `demo status --check` succeeds, this line can be ignored or traced to the
+  external probe.
+- `invalid JSON response` usually means Apache returned an HTML error page.
+  Inspect the Moodle log around the same timestamp; the response body is
+  intentionally suppressed.
+- `HTTP 400/403` usually indicates a canonical-origin/reverse-proxy mismatch or
+  a disabled web-service endpoint. Confirm `DEMO_BASE_URL` follows the exact
+  origin rules above and run `demo doctor`.
+- `HTTP 404` commonly indicates an incomplete/old plugin image. Rebuild using an
+  LB Planner revision that contains the 2.0 sync contract.
+
+After correcting the cause, `docker compose restart moodle` reruns the normal
+entrypoint. If status remains `failed`, `docker compose exec moodle demo apply`
+retries population. That apply is intentionally destructive to all non-admin
+users and courses in this disposable Moodle instance.
+
 ## `demo` CLI
 
 The image installs one executable:

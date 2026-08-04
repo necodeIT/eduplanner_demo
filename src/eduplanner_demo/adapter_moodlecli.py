@@ -14,7 +14,6 @@ from urllib.parse import urlparse
 from .logger import Logger, redact
 from .model import DemoConfig
 
-
 JSON_MARKER = "__EDUPLANNER_DEMO_JSON__"
 
 
@@ -543,3 +542,37 @@ demo_result($result);
 """,
             {"userId": representative_user_id},
         )
+
+    def create_personal_tokens(self, user_ids: dict[str, int]) -> dict[str, str]:
+        """Create or reuse each demo user's LB Planner web-service token.
+
+        Use this during population before Apache starts. Moodle's own token
+        utility applies the same service, account, capability, and expiry
+        checks as ``login/token.php`` without depending on an HTTP listener.
+        Returned tokens are private and must be passed only to the private
+        integration-manifest writer.
+        """
+        result = self.run_php(
+            r"""
+global $CFG, $DB, $USER;
+require_once($CFG->libdir . '/externallib.php');
+$service = $DB->get_record('external_services', [
+    'shortname' => 'lb_planner_sync_api',
+    'enabled' => 1,
+], '*', MUST_EXIST);
+$tokens = [];
+foreach ($input['userIds'] as $key => $userid) {
+    $user = core_user::get_user($userid, '*', MUST_EXIST);
+    \core\session\manager::set_user($user);
+    $token = \core_external\util::generate_token_for_current_user($service);
+    $tokens[$key] = $token->token;
+}
+demo_result($tokens);
+""",
+            {"userIds": user_ids},
+        )
+        if not isinstance(result, dict) or set(result) != set(user_ids):
+            raise MoodleError("Moodle returned an incomplete personal-token set")
+        if any(not isinstance(token, str) or not token for token in result.values()):
+            raise MoodleError("Moodle returned an invalid personal token")
+        return result

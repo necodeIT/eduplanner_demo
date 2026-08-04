@@ -2,15 +2,25 @@ from __future__ import annotations
 
 import json
 import os
+from io import BytesIO
 from pathlib import Path
+from typing import Self
+from urllib.error import HTTPError, URLError
 
 import pytest
 import yaml
 
+from eduplanner_demo.adapter_moodlecli import MoodleCLI, MoodleError
 from eduplanner_demo.config import Config, ConfigError
-from eduplanner_demo.adapter_moodlecli import MoodleCLI
 from eduplanner_demo.logger import redact
-from eduplanner_demo.populate import StateStore, base_url, config_hash, write_integration_manifest
+from eduplanner_demo.populate import (
+    INTERNAL_HTTP_ATTEMPTS,
+    StateStore,
+    _local_request,
+    base_url,
+    config_hash,
+    write_integration_manifest,
+)
 from eduplanner_demo.schemagen import generate_schemas
 
 
@@ -162,13 +172,16 @@ def test_private_integration_manifest_contains_every_configured_user(
     parsed = Config.from_data(courses, users)
     state = StateStore(tmp_path / "state")
     monkeypatch.setenv("DEMO_BASE_URL", "http://localhost:420")
-
-    def token_request(path: str, data: dict[str, str]) -> dict[str, str]:
-        assert path == "/login/token.php"
-        return {"token": f"private-{data['username']}"}
-
-    monkeypatch.setattr("eduplanner_demo.populate._local_request", token_request)
-    manifest_path = write_integration_manifest(parsed, state, "configuration-hash")
+    tokens = {
+        "alice_student": "private-alice_student",
+        "taylor_teacher": "private-taylor_teacher",
+    }
+    manifest_path = write_integration_manifest(
+        parsed,
+        state,
+        "configuration-hash",
+        tokens,
+    )
     manifest = json.loads(manifest_path.read_text())
 
     assert manifest_path.stat().st_mode & 0o777 == 0o600
@@ -182,22 +195,141 @@ def test_private_integration_manifest_contains_every_configured_user(
     assert manifest["users"][0]["token"] == "private-alice_student"
 
     first_bytes = manifest_path.read_bytes()
-    write_integration_manifest(parsed, state, "configuration-hash")
+    write_integration_manifest(parsed, state, "configuration-hash", tokens)
     assert manifest_path.read_bytes() == first_bytes
 
-    def rotated_token_request(path: str, data: dict[str, str]) -> dict[str, str]:
-        return {"token": f"rotated-{data['username']}"}
-
-    monkeypatch.setattr(
-        "eduplanner_demo.populate._local_request",
-        rotated_token_request,
+    rotated_tokens = {key: f"rotated-{key}" for key in tokens}
+    write_integration_manifest(
+        parsed,
+        state,
+        "configuration-hash",
+        rotated_tokens,
     )
-    write_integration_manifest(parsed, state, "configuration-hash")
     rotated = json.loads(manifest_path.read_text())
     assert rotated["users"][0]["token"] == "rotated-alice_student"
     assert [{**row, "token": None} for row in rotated["users"]] == [
         {**row, "token": None} for row in manifest["users"]
     ]
+
+
+def test_personal_tokens_use_moodle_cli_before_http_is_available(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adapter = MoodleCLI(tmp_path)
+    received: dict[str, dict[str, int]] = {}
+
+    def run_php(body: str, payload: dict[str, dict[str, int]]) -> dict[str, str]:
+        assert "generate_token_for_current_user" in body
+        received.update(payload)
+        return {key: f"private-{key}" for key in payload["userIds"]}
+
+    monkeypatch.setattr(adapter, "run_php", run_php)
+    assert adapter.create_personal_tokens({"alice": 3, "teacher": 4}) == {
+        "alice": "private-alice",
+        "teacher": "private-teacher",
+    }
+    assert received == {"userIds": {"alice": 3, "teacher": 4}}
+
+
+def test_personal_tokens_reject_incomplete_or_empty_results(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adapter = MoodleCLI(tmp_path)
+    monkeypatch.setattr(adapter, "run_php", lambda *args, **kwargs: {"alice": ""})
+    with pytest.raises(MoodleError, match="invalid personal token"):
+        adapter.create_personal_tokens({"alice": 3})
+
+    monkeypatch.setattr(adapter, "run_php", lambda *args, **kwargs: {})
+    with pytest.raises(MoodleError, match="incomplete personal-token set"):
+        adapter.create_personal_tokens({"alice": 3})
+
+
+class _JsonResponse:
+    """Minimal context-managed response used by internal HTTP tests."""
+
+    def __init__(self, payload: bytes):
+        self.payload = payload
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self.payload
+
+
+def test_internal_http_retries_transient_status_without_logging_body(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DEMO_BASE_URL", "http://localhost:420")
+    attempts = 0
+    delays: list[int] = []
+    private_body = b'{"token":"must-not-appear"}'
+
+    def transient_then_ready(*args: object, **kwargs: object) -> _JsonResponse:
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise HTTPError(
+                "http://127.0.0.1/login/token.php",
+                503,
+                "unavailable",
+                {},
+                BytesIO(private_body),
+            )
+        return _JsonResponse(b'{"token":"issued-token"}')
+
+    monkeypatch.setattr("eduplanner_demo.populate.urlopen", transient_then_ready)
+    monkeypatch.setattr("eduplanner_demo.populate.time.sleep", delays.append)
+
+    assert _local_request("/login/token.php", {"password": "private"}) == {
+        "token": "issued-token"
+    }
+    assert attempts == 3
+    assert delays == [1, 2]
+
+
+def test_internal_http_fails_fast_and_redacts_permanent_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DEMO_BASE_URL", "http://localhost:420")
+
+    def rejected(*args: object, **kwargs: object) -> _JsonResponse:
+        raise HTTPError(
+            "http://127.0.0.1/login/token.php",
+            403,
+            "forbidden",
+            {},
+            BytesIO(b'{"token":"private-response-token"}'),
+        )
+
+    monkeypatch.setattr("eduplanner_demo.populate.urlopen", rejected)
+    with pytest.raises(RuntimeError, match="HTTP 403") as raised:
+        _local_request("/login/token.php", {"password": "private-form-password"})
+    assert "private-response-token" not in str(raised.value)
+    assert "private-form-password" not in str(raised.value)
+
+
+def test_internal_http_exhaustion_has_stable_sanitized_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DEMO_BASE_URL", "http://localhost:420")
+    monkeypatch.setattr(
+        "eduplanner_demo.populate.urlopen",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            URLError("private network detail")
+        ),
+    )
+    monkeypatch.setattr("eduplanner_demo.populate.time.sleep", lambda _: None)
+
+    with pytest.raises(
+        RuntimeError, match=f"after {INTERNAL_HTTP_ATTEMPTS} attempts"
+    ) as raised:
+        _local_request("/login/token.php", {"password": "private-form-password"})
+    assert "private network detail" not in str(raised.value)
+    assert "private-form-password" not in str(raised.value)
 
 
 def test_repository_sample_has_migrated_legacy_exams_and_users() -> None:
