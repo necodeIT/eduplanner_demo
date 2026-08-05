@@ -4,13 +4,28 @@ FROM composer:2 AS plugin-builder
 ARG LBPLANNER_REF=main
 WORKDIR /work
 COPY --from=lbplanner /composer.json ./
+COPY --from=lbplanner /composer.lock ./
 COPY --from=lbplanner /lbplanner ./lbplanner
+RUN php <<'PHP'
+<?php
+$composer = json_decode(file_get_contents('composer.json'), true);
+$replace = array_keys($composer['replace'] ?? []);
+$lock = json_decode(file_get_contents('composer.lock'), true);
+$lock['packages'] = array_values(array_filter(
+    $lock['packages'] ?? [],
+    static fn (array $package): bool => !in_array($package['name'] ?? '', $replace, true),
+));
+file_put_contents(
+    'composer.lock',
+    json_encode($lock, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL,
+);
+PHP
 RUN test -f lbplanner/classes/sync/provider.php && \
     test -f lbplanner/classes/sync/contract.php || \
     (printf 'ERROR: LBPLANNER_REF=%s does not contain the LB Planner 2.0 sync contract.\n' "$LBPLANNER_REF" >&2; \
      printf 'Choose a 2.0 release tag, branch, or full commit SHA with LBPLANNER_REF.\n' >&2; \
      exit 1) && \
-    composer update --no-dev --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --optimize-autoloader
+    composer install --no-dev --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --optimize-autoloader
 
 FROM scratch AS modcustomfields
 ADD --checksum=sha256:873926a08589713a7d7f79629bb7e12c1b05ff429040188e1240878fe8d6aaef \
